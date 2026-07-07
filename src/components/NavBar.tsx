@@ -14,7 +14,8 @@ export function NavBar() {
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-surface/95 backdrop-blur
-        md:static md:inset-auto md:w-56 md:flex-col md:gap-1 md:border-t-0 md:border-r md:bg-transparent md:p-4"
+        md:sticky md:top-0 md:inset-auto md:max-h-screen md:w-56 md:flex-col md:gap-1
+        md:border-t-0 md:border-r md:bg-transparent md:p-4"
     >
       {links.map((link) => (
         <NavLink
