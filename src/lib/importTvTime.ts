@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid'
 import type { CustomList, Episode, ListEntry, Show } from '../types/schema'
-import { bestTitle, pickBestMatch, searchAniList, type AniListMedia } from './anilist'
+import { bestTitle, hasSequelRelation, pickBestMatch, searchAniList, type AniListMedia } from './anilist'
 import { deriveWatchStatus } from './statusRules'
 import type { ParsedTvTimeData, RawFavoriteRef } from './tvtimeParse'
 
@@ -98,9 +98,8 @@ export async function buildImportPlan(
       notes.push('AniList has no episode count for this title yet — episode list left empty.')
     }
 
-    const totalEpisodes = matched?.episodes ?? null
-    const airingStatus = matched?.status ?? null
-    const status = deriveWatchStatus(episodes, totalEpisodes, airingStatus, raw.archived ? 'stopped' : 'watching')
+    const hasSequel = matched ? hasSequelRelation(matched) : false
+    const status = deriveWatchStatus(episodes, hasSequel, raw.archived ? 'stopped' : 'watching')
 
     shows.push({
       id: uuid(),
@@ -109,9 +108,9 @@ export async function buildImportPlan(
       coverUrl: matched?.coverImage.large ?? null,
       customCoverUrl: null,
       format: matched?.format ?? null,
-      totalEpisodes,
+      totalEpisodes: matched?.episodes ?? null,
       episodeDurationMin: matched?.duration ?? null,
-      airingStatus,
+      hasSequel,
       status,
       rewatchCount: showRewatchCount,
       episodes,

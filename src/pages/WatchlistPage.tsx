@@ -5,7 +5,7 @@ import { ShowCard } from '../components/ShowCard'
 import { SearchAniListModal } from '../components/SearchAniListModal'
 import { WATCH_STATUSES, type Episode, type Show, type WatchStatus } from '../types/schema'
 import type { AniListMedia } from '../lib/anilist'
-import { bestTitle } from '../lib/anilist'
+import { bestTitle, hasSequelRelation } from '../lib/anilist'
 
 const FILTERS: { value: WatchStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -44,7 +44,7 @@ export function WatchlistPage() {
       format: media.format,
       totalEpisodes: media.episodes,
       episodeDurationMin: media.duration,
-      airingStatus: media.status,
+      hasSequel: hasSequelRelation(media),
       status: 'plan_to_watch',
       rewatchCount: 0,
       episodes,

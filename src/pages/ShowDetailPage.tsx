@@ -38,7 +38,7 @@ export function ShowDetailPage() {
   // Up, otherwise Watching. "Stopped" is manual-only and never auto-overridden.
   function applyEpisodes(episodes: Episode[]) {
     if (!show) return
-    const status = deriveWatchStatus(episodes, show.totalEpisodes, show.airingStatus, show.status)
+    const status = deriveWatchStatus(episodes, show.hasSequel, show.status)
     update({ episodes, status })
   }
 

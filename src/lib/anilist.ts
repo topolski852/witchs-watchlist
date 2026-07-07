@@ -9,20 +9,31 @@ export interface AniListMedia {
   episodes: number | null
   duration: number | null
   synonyms: string[]
+  relations: { edges: { relationType: string; node: { id: number; type: string } | null }[] } | null
 }
+
+const MEDIA_FIELDS = `
+  id
+  title { romaji english native }
+  coverImage { large extraLarge }
+  format
+  status
+  episodes
+  duration
+  synonyms
+  relations {
+    edges {
+      relationType
+      node { id type }
+    }
+  }
+`
 
 const SEARCH_QUERY = `
 query ($search: String, $page: Int) {
   Page(page: $page, perPage: 8) {
     media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
-      id
-      title { romaji english native }
-      coverImage { large extraLarge }
-      format
-      status
-      episodes
-      duration
-      synonyms
+      ${MEDIA_FIELDS}
     }
   }
 }`
@@ -30,14 +41,7 @@ query ($search: String, $page: Int) {
 const BY_ID_QUERY = `
 query ($id: Int) {
   Media(id: $id, type: ANIME) {
-    id
-    title { romaji english native }
-    coverImage { large extraLarge }
-    format
-    status
-    episodes
-    duration
-    synonyms
+    ${MEDIA_FIELDS}
   }
 }`
 
@@ -116,6 +120,18 @@ export function getAniListById(id: number): Promise<AniListMedia | null> {
     const data = await graphql<{ Media: AniListMedia | null }>(BY_ID_QUERY, { id })
     return data.Media
   })
+}
+
+/**
+ * Whether AniList knows of a sequel (another season/part continuing the
+ * story) for this entry — used to decide Caught Up (more is coming) vs.
+ * Completed (as far as we know, this is the end) once every episode we have
+ * is watched. Absence of a sequel relation isn't proof one will never be
+ * announced, but it's the best signal available, and it matches the "default
+ * to Completed when we don't know" preference.
+ */
+export function hasSequelRelation(media: AniListMedia): boolean {
+  return media.relations?.edges.some((e) => e.relationType === 'SEQUEL' && e.node?.type === 'ANIME') ?? false
 }
 
 export function bestTitle(media: AniListMedia): string {

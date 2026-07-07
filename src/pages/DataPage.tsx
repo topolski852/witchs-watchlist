@@ -4,14 +4,16 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import * as db from '../db/db'
 import { missingRequiredFiles, parseTvTimeFiles } from '../lib/tvtimeParse'
 import { buildImportPlan, type ImportPlan, type ImportProgress } from '../lib/importTvTime'
+import { deriveWatchStatus } from '../lib/statusRules'
 import { ImportReview } from './ImportReview'
 
 type InputWithDirectory = HTMLInputElement & { webkitdirectory?: boolean }
 
 export function DataPage() {
-  const { shows, customLists, refresh, commitImportPlan } = useData()
+  const { shows, customLists, refresh, commitImportPlan, saveShow } = useData()
   const [backups, setBackups] = useState<Awaited<ReturnType<typeof db.listBackups>>>([])
   const [confirmWipeImport, setConfirmWipeImport] = useState<File | null>(null)
+  const [confirmRecalculate, setConfirmRecalculate] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,6 +64,26 @@ export function DataPage() {
     } finally {
       setConfirmWipeImport(null)
     }
+  }
+
+  async function recalculateStatuses() {
+    setConfirmRecalculate(false)
+    setError(null)
+    await db.exportSnapshot('pre-recalculate snapshot')
+    let changed = 0
+    for (const show of shows) {
+      const nextStatus = deriveWatchStatus(show.episodes, show.hasSequel ?? false, show.status)
+      if (nextStatus !== show.status) {
+        await saveShow({ ...show, status: nextStatus })
+        changed++
+      }
+    }
+    setStatus(
+      changed > 0
+        ? `Recalculated statuses — ${changed} show${changed === 1 ? '' : 's'} updated from episode progress.`
+        : 'Recalculated statuses — everything already matched episode progress.',
+    )
+    loadBackups()
   }
 
   function handleFolderPicked(fileList: FileList | null) {
@@ -175,6 +197,22 @@ export function DataPage() {
       </section>
 
       <section>
+        <h2 className="mb-2 text-sm font-semibold text-text">Maintenance</h2>
+        <p className="mb-2 text-xs text-text-faint">
+          Re-derive every show's status from its actual episode progress (0 watched → Plan to Watch, all watched
+          → Completed/Caught Up, otherwise Watching). Useful after this feature shipped, since shows imported or
+          edited before it existed may have a stale status. "Stopped" shows are left alone.
+        </p>
+        <button
+          type="button"
+          onClick={() => setConfirmRecalculate(true)}
+          className="rounded-lg border border-border px-3 py-2 text-sm text-text-muted hover:bg-surface"
+        >
+          Recalculate all statuses
+        </button>
+      </section>
+
+      <section>
         <h2 className="mb-2 text-sm font-semibold text-text">Import from TV Time</h2>
         <p className="mb-2 text-xs text-text-faint">
           Select your TV Time data export folder (the one with <code>user_tv_show_data.csv</code> etc. in it).
@@ -242,6 +280,15 @@ export function DataPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={confirmRecalculate}
+        title="Recalculate all statuses?"
+        message="This updates the status of any show whose current status doesn't match its episode progress. A backup snapshot is taken first, and you can always change a status back manually afterward."
+        confirmLabel="Recalculate"
+        onCancel={() => setConfirmRecalculate(false)}
+        onConfirm={recalculateStatuses}
+      />
 
       <ConfirmDialog
         open={!!confirmWipeImport}

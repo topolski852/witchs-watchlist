@@ -1,28 +1,28 @@
 import type { Episode, WatchStatus } from '../types/schema'
 
 /**
- * Derives watch status purely from episode progress: none watched → Plan to
- * Watch, all watched → Completed (or Caught Up if AniList says it's still
- * airing), some watched → Watching. "Stopped" is the one manual escape hatch —
- * it's never auto-overridden, since dropping a show partway through isn't
- * something episode counts alone can express.
+ * Derives watch status purely from episode progress:
+ *   0 watched            -> Plan to Watch ("Haven't Started")
+ *   some watched          -> Watching
+ *   all watched + sequel  -> Caught Up (more of the story is coming)
+ *   all watched, no sequel -> Completed ("Watched")
+ * "Stopped" is the one manual escape hatch — it's never auto-overridden,
+ * since dropping a show partway through isn't derivable from episode counts.
  *
- * totalEpisodes must be AniList's confirmed count, not just episodes.length —
- * for an unmatched show, episodes.length is fabricated from "however many
- * we've logged," and treating that as "the whole series" would wrongly
- * mark it Completed the moment every logged episode is checked off.
+ * hasSequel defaults to false when unknown (unmatched shows, or AniList
+ * simply hasn't listed a sequel yet) — per spec, no data means Completed,
+ * not Caught Up.
  */
 export function deriveWatchStatus(
   episodes: Episode[],
-  totalEpisodes: number | null,
-  airingStatus: string | null,
+  hasSequel: boolean,
   currentStatus: WatchStatus,
 ): WatchStatus {
   if (currentStatus === 'stopped') return 'stopped'
+  const total = episodes.length
+  if (total === 0) return currentStatus
   const watchedCount = episodes.filter((e) => e.watched).length
   if (watchedCount === 0) return 'plan_to_watch'
-  if (totalEpisodes != null && watchedCount === totalEpisodes) {
-    return airingStatus === 'RELEASING' ? 'caught_up' : 'completed'
-  }
+  if (watchedCount === total) return hasSequel ? 'caught_up' : 'completed'
   return 'watching'
 }
