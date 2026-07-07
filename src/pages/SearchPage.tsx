@@ -2,19 +2,24 @@ import { useState } from 'react'
 import { useData } from '../store/useData'
 import { CoverImage } from '../components/CoverImage'
 import { AddCustomShowForm } from '../components/AddCustomShowForm'
-import { bestTitle, searchAniList, type AniListMedia } from '../lib/anilist'
+import { AniListDetailsPanel } from '../components/AniListDetailsPanel'
+import { EpisodePreviewList } from '../components/EpisodePreviewList'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ChevronIcon } from '../components/icons'
+import { bestTitle, hasSequelRelation, searchAniList, type AniListMedia } from '../lib/anilist'
 import { buildShowFromMedia } from '../lib/newShow'
 import { relinkFavorites } from '../lib/relinkFavorites'
 import type { Show } from '../types/schema'
 
 export function SearchPage() {
-  const { shows, customLists, saveShow, saveCustomList } = useData()
+  const { shows, customLists, saveShow, saveCustomList, removeShow } = useData()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<AniListMedia[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [justAdded, setJustAdded] = useState<Set<number>>(new Set())
   const [status, setStatus] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<number | null>(null)
+  const [removing, setRemoving] = useState<Show | null>(null)
 
   const existingByAnilistId = new Map(shows.filter((s) => s.anilistId != null).map((s) => [s.anilistId, s]))
 
@@ -34,7 +39,7 @@ export function SearchPage() {
 
   async function handleAdd(media: AniListMedia) {
     await saveShow(buildShowFromMedia(media))
-    setJustAdded((prev) => new Set(prev).add(media.id))
+    setStatus(`Added "${bestTitle(media)}" to Plan to Watch.`)
   }
 
   // If a Favorite-list entry already exists with this exact title (e.g. RWBY,
@@ -61,8 +66,8 @@ export function SearchPage() {
         </div>
       )}
       <p className="mb-3 text-xs text-text-faint">
-        Search AniList and add anime to your Plan to Watch list — nothing is added just by browsing, only when you
-        tap Add.
+        Search AniList, open a result to read its description and episode list, then add or remove it from your
+        watchlist whenever you're ready — nothing changes just by browsing.
       </p>
       <form onSubmit={runSearch} className="flex gap-2">
         <input
@@ -86,28 +91,45 @@ export function SearchPage() {
       <div className="mt-3 space-y-2">
         {results.map((media) => {
           const existing = existingByAnilistId.get(media.id)
-          const added = justAdded.has(media.id) || !!existing
+          const added = !!existing
+          const isExpanded = expanded === media.id
           return (
-            <div key={media.id} className="flex items-center gap-3 rounded-lg border border-border p-2">
-              <CoverImage src={media.coverImage.large} alt="" className="h-16 w-11 shrink-0 rounded" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-text">{bestTitle(media)}</p>
-                <p className="text-xs text-text-faint">
-                  {media.format ?? 'Unknown format'} · {media.episodes ?? '?'} ep
-                </p>
+            <div key={media.id} className="rounded-lg border border-border p-2">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setExpanded(isExpanded ? null : media.id)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <CoverImage src={media.coverImage.large} alt="" className="h-16 w-11 shrink-0 rounded" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text">{bestTitle(media)}</p>
+                    <p className="text-xs text-text-faint">
+                      {media.format ?? 'Unknown format'} · {media.episodes ?? '?'} ep
+                    </p>
+                  </div>
+                  <ChevronIcon direction={isExpanded ? 'up' : 'down'} className="h-4 w-4 shrink-0 text-text-faint" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (added && existing ? setRemoving(existing) : handleAdd(media))}
+                  className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium ${
+                    added
+                      ? 'border border-status-stopped/50 text-status-stopped hover:bg-status-stopped/10'
+                      : 'bg-accent text-white hover:bg-accent-hover'
+                  }`}
+                >
+                  {added ? 'Remove' : '+ Add'}
+                </button>
               </div>
-              <button
-                type="button"
-                disabled={added}
-                onClick={() => handleAdd(media)}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium ${
-                  added
-                    ? 'border border-border text-text-faint'
-                    : 'bg-accent text-white hover:bg-accent-hover'
-                }`}
-              >
-                {added ? 'Added ✓' : '+ Add'}
-              </button>
+
+              {isExpanded && (
+                <div className="mt-3 border-t border-border pt-3">
+                  <AniListDetailsPanel anilistId={media.id} hasSequel={hasSequelRelation(media)} />
+                  <h4 className="mb-1.5 mt-3 text-xs font-semibold text-text-muted">Episodes</h4>
+                  <EpisodePreviewList anilistId={media.id} totalEpisodes={media.episodes} />
+                </div>
+              )}
             </div>
           )
         })}
@@ -119,6 +141,19 @@ export function SearchPage() {
       <div className="mt-4">
         <AddCustomShowForm onAdd={handleAddCustomShow} />
       </div>
+
+      <ConfirmDialog
+        open={!!removing}
+        title="Remove this show?"
+        message={`"${removing?.title}" and all its episode/rewatch data will be deleted from this device. Export a backup first if you're not sure.`}
+        confirmLabel="Remove"
+        danger
+        onCancel={() => setRemoving(null)}
+        onConfirm={async () => {
+          if (removing) await removeShow(removing.id)
+          setRemoving(null)
+        }}
+      />
     </div>
   )
 }

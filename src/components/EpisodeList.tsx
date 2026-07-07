@@ -1,19 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { Episode } from '../types/schema'
-import { getStreamingEpisodes, type StreamingEpisode } from '../lib/anilist'
+import { getStreamingEpisodes, streamingEpisodeTitle, type StreamingEpisode } from '../lib/anilist'
 import { CoverImage } from './CoverImage'
 import { CloseIcon } from './icons'
 
 type ViewMode = 'list' | 'grid'
-
-function episodeTitle(ep: Episode, streaming: StreamingEpisode | undefined): string {
-  const raw = streaming?.title?.trim()
-  if (!raw) return `Episode ${ep.number}`
-  // Streaming titles often come as "Episode 3 - Actual Title" — keep just the
-  // part after the dash when it's there, since we already show the number.
-  const dashSplit = raw.match(/^Episode\s+\d+\s*[-–]\s*(.+)$/i)
-  return dashSplit ? dashSplit[1] : raw
-}
 
 /** Groups by seasonNumber, preserving first-seen order. Only meaningful for
  * custom shows, which are the only ones that ever set it — AniList-backed
@@ -139,7 +130,7 @@ export function EpisodeList({
                       </button>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-medium text-text">
-                          {ep.number}. {episodeTitle(ep, stream)}
+                          {ep.number}. {streamingEpisodeTitle(ep.number, stream)}
                         </p>
                         <p className="text-[11px] text-text-faint">
                           {ep.watchCount === 0 ? 'Not watched' : `Watched ${ep.watchCount}×`}

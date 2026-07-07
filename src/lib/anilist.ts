@@ -207,6 +207,15 @@ export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
   })
 }
 
+/** "Episode 3 - Actual Title" -> "Actual Title", falling back to "Episode N"
+ * when there's no streaming title for that slot. */
+export function streamingEpisodeTitle(number: number, streaming: StreamingEpisode | undefined): string {
+  const raw = streaming?.title?.trim()
+  if (!raw) return `Episode ${number}`
+  const dashSplit = raw.match(/^Episode\s+\d+\s*[-–]\s*(.+)$/i)
+  return dashSplit ? dashSplit[1] : raw
+}
+
 /**
  * Whether AniList knows of a sequel (another season/part continuing the
  * story) for this entry — used to decide Caught Up (more is coming) vs.
