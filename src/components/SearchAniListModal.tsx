@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { bestTitle, searchAniList, type AniListMedia } from '../lib/anilist'
 import { CoverImage } from './CoverImage'
+import { CloseIcon } from './icons'
 
 export function SearchAniListModal({
   open,
@@ -39,7 +40,7 @@ export function SearchAniListModal({
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-text">Add from AniList</h2>
           <button type="button" onClick={onClose} className="text-text-faint hover:text-text">
-            ✕
+            <CloseIcon className="h-4 w-4" />
           </button>
         </div>
         <form onSubmit={runSearch} className="mt-3 flex gap-2">

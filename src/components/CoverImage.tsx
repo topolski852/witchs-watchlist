@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { WitchHatMoonIcon } from './icons'
 
 export function CoverImage({
   src,
@@ -13,11 +14,8 @@ export function CoverImage({
 
   if (!src || failed) {
     return (
-      <div
-        className={`flex items-center justify-center bg-surface-raised text-2xl ${className}`}
-        aria-hidden
-      >
-        🌙
+      <div className={`flex items-center justify-center bg-surface-raised ${className}`} aria-hidden>
+        <WitchHatMoonIcon className="h-2/5 w-2/5 text-text-faint" />
       </div>
     )
   }

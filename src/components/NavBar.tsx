@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
+import { CauldronIcon, FoxIcon, HourglassIcon, SparkleIcon } from './icons'
 
 const links = [
-  { to: '/', label: 'Home', icon: '📖' },
-  { to: '/lists', label: 'Lists', icon: '⭐' },
-  { to: '/stats', label: 'Stats', icon: '⏳' },
-  { to: '/data', label: 'Data', icon: '🗃' },
+  { to: '/', label: 'Home', Icon: FoxIcon },
+  { to: '/lists', label: 'Lists', Icon: SparkleIcon },
+  { to: '/stats', label: 'Stats', Icon: HourglassIcon },
+  { to: '/data', label: 'Data', Icon: CauldronIcon },
 ]
 
 const linkBase =
@@ -28,9 +29,7 @@ export function NavBar() {
             }`
           }
         >
-          <span aria-hidden className="text-lg md:text-base">
-            {link.icon}
-          </span>
+          <link.Icon aria-hidden className="h-5 w-5 md:h-4 md:w-4" />
           <span>{link.label}</span>
         </NavLink>
       ))}

@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { useData } from '../store/useData'
 import { CoverImage } from '../components/CoverImage'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { CloseIcon } from '../components/icons'
 import type { CustomList, ListEntry, ListEntryType } from '../types/schema'
 
 function AddEntryForm({ onAdd }: { onAdd: (entry: ListEntry) => void }) {
@@ -121,9 +122,9 @@ function ListSection({ list }: { list: CustomList }) {
               <button
                 type="button"
                 onClick={() => setRemovingEntry(entry)}
-                className="absolute right-1 top-1 hidden rounded-full bg-surface/90 px-1.5 py-0.5 text-[10px] text-status-stopped group-hover:block"
+                className="absolute right-1 top-1 hidden rounded-full bg-surface/90 p-1 text-status-stopped group-hover:block"
               >
-                ✕
+                <CloseIcon className="h-3 w-3" />
               </button>
             </div>
           ))}

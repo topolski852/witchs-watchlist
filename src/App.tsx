@@ -6,6 +6,7 @@ import { ShowDetailPage } from './pages/ShowDetailPage'
 import { ListsPage } from './pages/ListsPage'
 import { StatsPage } from './pages/StatsPage'
 import { DataPage } from './pages/DataPage'
+import { WitchHatMoonIcon } from './components/icons'
 
 function App() {
   return (
@@ -13,9 +14,7 @@ function App() {
       <NavBar />
       <div className="flex-1 pb-16 md:pb-0">
         <header className="flex items-center gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:pt-6">
-          <span aria-hidden className="text-xl">
-            🌙
-          </span>
+          <WitchHatMoonIcon aria-hidden className="h-6 w-6 text-accent" />
           <h1 className="font-display text-lg tracking-wide text-text md:text-xl">
             The Witch's Watchlist
           </h1>

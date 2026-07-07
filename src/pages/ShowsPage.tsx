@@ -6,6 +6,7 @@ import { SearchAniListModal } from '../components/SearchAniListModal'
 import { WATCH_STATUSES, type Episode, type Show, type WatchStatus } from '../types/schema'
 import type { AniListMedia } from '../lib/anilist'
 import { bestTitle, hasSequelRelation } from '../lib/anilist'
+import { ChevronIcon } from '../components/icons'
 
 // Home-feed order: active shows first, "done with it" statuses last.
 const SECTION_ORDER: WatchStatus[] = ['watching', 'caught_up', 'plan_to_watch', 'completed', 'stopped']
@@ -121,9 +122,10 @@ export function ShowsPage() {
                     {SECTION_LABELS[section.status]}{' '}
                     <span className="font-normal text-text-faint">({section.shows.length})</span>
                   </span>
-                  <span aria-hidden className="text-text-faint">
-                    {collapsed.has(section.status) ? '▼' : '▲'}
-                  </span>
+                  <ChevronIcon
+                    direction={collapsed.has(section.status) ? 'down' : 'up'}
+                    className="h-4 w-4 text-text-faint"
+                  />
                 </button>
                 {!collapsed.has(section.status) && (
                   <div className="space-y-2">

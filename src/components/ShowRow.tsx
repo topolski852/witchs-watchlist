@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import type { Show } from '../types/schema'
 import { CoverImage } from './CoverImage'
 import { StatusBadge } from './StatusBadge'
+import { FlagIcon } from './icons'
 
 export function ShowRow({ show }: { show: Show }) {
   const watchedCount = show.episodes.filter((e) => e.watched).length
@@ -34,8 +35,8 @@ export function ShowRow({ show }: { show: Show }) {
             <StatusBadge status={show.status} />
             {show.rewatchCount > 0 && <span className="text-[11px] text-accent">×{show.rewatchCount + 1}</span>}
             {show.needsReview && (
-              <span className="text-[11px] font-semibold text-status-stopped" title="Needs review">
-                ⚑
+              <span title="Needs review">
+                <FlagIcon className="h-3 w-3 text-status-stopped" />
               </span>
             )}
           </div>

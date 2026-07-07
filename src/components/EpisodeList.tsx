@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Episode } from '../types/schema'
 import { getStreamingEpisodes, type StreamingEpisode } from '../lib/anilist'
 import { CoverImage } from './CoverImage'
+import { CloseIcon } from './icons'
 
 type ViewMode = 'list' | 'grid'
 
@@ -152,7 +153,7 @@ export function EpisodeList({
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-text">Episode {selectedEp.number}</p>
                 <button type="button" onClick={() => setSelected(null)} className="text-text-faint hover:text-text">
-                  ✕
+                  <CloseIcon className="h-4 w-4" />
                 </button>
               </div>
               <label className="mt-2 flex items-center gap-2 text-sm text-text-muted">

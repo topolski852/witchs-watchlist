@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getAniListDetails, type AniListDetails } from '../lib/anilist'
+import { ChevronIcon } from './icons'
 
 function formatDate(d: AniListDetails['startDate']): string | null {
   if (!d?.year) return null
@@ -49,9 +50,7 @@ export function AboutSection({ anilistId, hasSequel }: { anilistId: number | nul
         className="flex w-full items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-text"
       >
         About
-        <span aria-hidden className="text-text-faint">
-          {open ? '▲' : '▼'}
-        </span>
+        <ChevronIcon direction={open ? 'up' : 'down'} className="h-4 w-4 text-text-faint" />
       </button>
 
       {open && (

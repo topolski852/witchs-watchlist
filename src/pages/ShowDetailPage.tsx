@@ -7,6 +7,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { MarkThroughDialog } from '../components/MarkThroughDialog'
 import { AboutSection } from '../components/AboutSection'
 import { EpisodeList } from '../components/EpisodeList'
+import { FlagIcon } from '../components/icons'
 import { WATCH_STATUSES, type Episode, type WatchStatus } from '../types/schema'
 import { showWatchTime, formatMinutes } from '../lib/watchTime'
 import { deriveWatchStatus } from '../lib/statusRules'
@@ -177,7 +178,9 @@ export function ShowDetailPage() {
 
       {show.needsReview && (
         <div className="mt-4 rounded-lg border border-status-stopped/50 bg-status-stopped/10 p-3 text-sm text-text">
-          <p className="font-medium text-status-stopped">⚑ Needs review</p>
+          <p className="flex items-center gap-1.5 font-medium text-status-stopped">
+            <FlagIcon className="h-4 w-4" /> Needs review
+          </p>
           {show.reviewNote && <p className="mt-1 text-text-muted">{show.reviewNote}</p>}
           <button
             type="button"

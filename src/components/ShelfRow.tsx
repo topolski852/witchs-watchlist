@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { CoverImage } from './CoverImage'
+import { ChevronIcon } from './icons'
 
 export interface ShelfItem {
   id: string
@@ -17,9 +18,7 @@ export function ShelfRow({ title, count, to, items }: { title: string; count: nu
         <span>
           {title} <span className="font-normal text-text-faint">({count})</span>
         </span>
-        <span aria-hidden className="text-text-faint">
-          ›
-        </span>
+        <ChevronIcon direction="right" className="h-4 w-4 text-text-faint" />
       </Link>
       <div className="flex gap-2.5 overflow-x-auto pb-1">
         {items.map((item) => {
