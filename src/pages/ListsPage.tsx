@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { v4 as uuid } from 'uuid'
 import { useData } from '../store/useData'
 import { CoverImage } from '../components/CoverImage'
@@ -115,19 +116,30 @@ function ListSection({ list }: { list: CustomList }) {
 
       {list.entries.length > 0 && (
         <div className="mb-2 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-          {list.entries.map((entry) => (
-            <div key={entry.id} className="group relative overflow-hidden rounded-lg border border-border bg-surface">
-              <CoverImage src={entry.coverUrl} alt={entry.title} className="aspect-[2/3] w-full" />
-              <p className="line-clamp-2 p-1.5 text-[11px] leading-tight text-text">{entry.title}</p>
-              <button
-                type="button"
-                onClick={() => setRemovingEntry(entry)}
-                className="absolute right-1 top-1 hidden rounded-full bg-surface/90 p-1 text-status-stopped group-hover:block"
-              >
-                <CloseIcon className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
+          {list.entries.map((entry) => {
+            const content = (
+              <>
+                <CoverImage src={entry.coverUrl} alt={entry.title} className="aspect-[2/3] w-full" />
+                <p className="line-clamp-2 p-1.5 text-[11px] leading-tight text-text">{entry.title}</p>
+              </>
+            )
+            return (
+              <div key={entry.id} className="group relative overflow-hidden rounded-lg border border-border bg-surface">
+                {entry.linkedShowId ? <Link to={`/show/${entry.linkedShowId}`}>{content}</Link> : content}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setRemovingEntry(entry)
+                  }}
+                  className="absolute right-1 top-1 hidden rounded-full bg-surface/90 p-1 text-status-stopped group-hover:block"
+                >
+                  <CloseIcon className="h-3 w-3" />
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
 
