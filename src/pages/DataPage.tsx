@@ -5,6 +5,7 @@ import * as db from '../db/db'
 import { missingRequiredFiles, parseTvTimeFiles } from '../lib/tvtimeParse'
 import { buildImportPlan, type ImportPlan, type ImportProgress } from '../lib/importTvTime'
 import { deriveWatchStatus } from '../lib/statusRules'
+import { relinkFavorites } from '../lib/relinkFavorites'
 import { ImportReview } from './ImportReview'
 
 type InputWithDirectory = HTMLInputElement & { webkitdirectory?: boolean }
@@ -87,40 +88,19 @@ export function DataPage() {
     loadBackups()
   }
 
-  async function relinkFavorites() {
+  async function runRelinkFavorites() {
     setConfirmRelink(false)
     setError(null)
     await db.exportSnapshot('pre-relink-favorites snapshot')
 
-    // TV Time's raw favorite-list title often doesn't match AniList's
-    // resolved show title as a plain string (e.g. "Frieren" vs "Frieren:
-    // Beyond Journey's End"), so entries can end up with no linkedShowId
-    // even though the show is already in the watchlist. Re-check by AniList
-    // id first (reliable), then by normalized title as a fallback.
-    const showByAnilistId = new Map(shows.filter((s) => s.anilistId != null).map((s) => [s.anilistId, s]))
-    const showByTitle = new Map(shows.map((s) => [s.title.trim().toLowerCase(), s]))
-
-    let changedEntries = 0
-    for (const list of customLists) {
-      let listChanged = false
-      const entries = list.entries.map((entry) => {
-        if (entry.linkedShowId) return entry
-        const match =
-          (entry.anilistId != null ? showByAnilistId.get(entry.anilistId) : undefined) ??
-          showByTitle.get(entry.title.trim().toLowerCase())
-        if (!match) return entry
-        listChanged = true
-        changedEntries++
-        return { ...entry, linkedShowId: match.id }
-      })
-      if (listChanged) {
-        await saveCustomList({ ...list, entries, updatedAt: new Date().toISOString() })
-      }
+    const { updatedLists, changedCount } = relinkFavorites(customLists, shows)
+    for (const list of updatedLists) {
+      await saveCustomList(list)
     }
 
     setStatus(
-      changedEntries > 0
-        ? `Relinked ${changedEntries} favorite entr${changedEntries === 1 ? 'y' : 'ies'} to shows already in your watchlist.`
+      changedCount > 0
+        ? `Relinked ${changedCount} favorite entr${changedCount === 1 ? 'y' : 'ies'} to shows already in your watchlist.`
         : 'Relinked favorites — nothing needed fixing.',
     )
     loadBackups()
@@ -349,7 +329,7 @@ export function DataPage() {
         message="Checks every Favorite list entry that isn't linked to a show yet, and links it if a matching show is already in your watchlist (by AniList id, then by title). A backup snapshot is taken first, and entries that are already linked or that don't match anything are left alone."
         confirmLabel="Relink"
         onCancel={() => setConfirmRelink(false)}
-        onConfirm={relinkFavorites}
+        onConfirm={runRelinkFavorites}
       />
 
       <ConfirmDialog

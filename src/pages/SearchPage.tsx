@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import { useData } from '../store/useData'
 import { CoverImage } from '../components/CoverImage'
+import { AddCustomShowForm } from '../components/AddCustomShowForm'
 import { bestTitle, searchAniList, type AniListMedia } from '../lib/anilist'
 import { buildShowFromMedia } from '../lib/newShow'
+import { relinkFavorites } from '../lib/relinkFavorites'
+import type { Show } from '../types/schema'
 
 export function SearchPage() {
-  const { shows, saveShow } = useData()
+  const { shows, customLists, saveShow, saveCustomList } = useData()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<AniListMedia[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [justAdded, setJustAdded] = useState<Set<number>>(new Set())
+  const [status, setStatus] = useState<string | null>(null)
 
   const existingByAnilistId = new Map(shows.filter((s) => s.anilistId != null).map((s) => [s.anilistId, s]))
 
@@ -33,8 +37,29 @@ export function SearchPage() {
     setJustAdded((prev) => new Set(prev).add(media.id))
   }
 
+  // If a Favorite-list entry already exists with this exact title (e.g. RWBY,
+  // added as a plain favorite before it had a trackable Show), link it up
+  // immediately instead of making the user run the Data tab's Relink tool.
+  async function handleAddCustomShow(show: Show) {
+    await saveShow(show)
+    const { updatedLists, changedCount } = relinkFavorites(customLists, [show])
+    for (const list of updatedLists) {
+      await saveCustomList(list)
+    }
+    setStatus(
+      changedCount > 0
+        ? `Added "${show.title}" and linked it to ${changedCount} matching favorite entr${changedCount === 1 ? 'y' : 'ies'}.`
+        : `Added "${show.title}" to Plan to Watch.`,
+    )
+  }
+
   return (
     <div className="pb-6">
+      {status && (
+        <div className="mb-3 rounded-lg border border-status-completed/50 bg-status-completed/10 p-3 text-sm text-text">
+          {status}
+        </div>
+      )}
       <p className="mb-3 text-xs text-text-faint">
         Search AniList and add anime to your Plan to Watch list — nothing is added just by browsing, only when you
         tap Add.
@@ -89,6 +114,10 @@ export function SearchPage() {
         {!loading && results.length === 0 && query && !error && (
           <p className="text-sm text-text-faint">No results yet — try a search.</p>
         )}
+      </div>
+
+      <div className="mt-4">
+        <AddCustomShowForm onAdd={handleAddCustomShow} />
       </div>
     </div>
   )
