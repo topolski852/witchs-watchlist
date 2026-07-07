@@ -20,6 +20,11 @@ export interface Episode {
   watchCount: number
   /** One entry per watch, in order — watchDates.length === watchCount. */
   watchDates: string[]
+  /** Per-episode override in minutes — null means "use the show's
+   * episodeDurationMin". Lets custom shows with uneven episode lengths
+   * (e.g. RWBY's short early volumes vs. later normal-length ones) be set
+   * per season instead of forcing one duration across the whole show. */
+  durationMin: number | null
 }
 
 export interface Show {

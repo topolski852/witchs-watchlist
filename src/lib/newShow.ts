@@ -11,6 +11,7 @@ export function buildShowFromMedia(media: AniListMedia): Show {
     seasonNumber: null,
     watchCount: 0,
     watchDates: [],
+    durationMin: null,
   }))
   return {
     id: uuid(),

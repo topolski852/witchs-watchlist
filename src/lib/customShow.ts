@@ -32,6 +32,7 @@ export function buildCustomShow(input: CustomShowInput): Show {
         seasonNumber: seasonIndex + 1,
         watchCount: 0,
         watchDates: [],
+        durationMin: null,
       })
     }
   })

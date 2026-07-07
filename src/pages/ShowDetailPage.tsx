@@ -101,6 +101,32 @@ export function ShowDetailPage() {
     update({ watchCount: Math.max(0, show.watchCount + delta), episodes, status })
   }
 
+  // Same bulk-set idea as the show-level stepper, scoped to one season —
+  // doesn't touch show.watchCount, since a partial (single-season) rewatch
+  // isn't "the whole show watched again."
+  function setSeasonWatchCount(season: number, count: number) {
+    if (!show) return
+    const now = new Date().toISOString()
+    const episodes = show.episodes.map((e) => {
+      if (e.seasonNumber !== season) return e
+      const watchCount = Math.max(0, count)
+      const watchDates = Array.from({ length: watchCount }, (_, i) => e.watchDates[i] ?? now)
+      return { ...e, watchCount, watchDates }
+    })
+    const status = deriveWatchStatus(episodes, show.hasSequel, show.status)
+    update({ episodes, status })
+  }
+
+  // Lets shows with uneven episode lengths (RWBY's short early volumes vs.
+  // later normal-length ones) set duration per season instead of one value
+  // for the whole show. Doesn't touch status/watch time totals directly —
+  // showWatchTime already reads durationMin per episode with a fallback.
+  function setSeasonDuration(season: number, minutes: number) {
+    if (!show) return
+    const episodes = show.episodes.map((e) => (e.seasonNumber === season ? { ...e, durationMin: minutes } : e))
+    update({ episodes })
+  }
+
   return (
     <div className="pb-6">
       {show.bannerUrl ? (
@@ -250,8 +276,11 @@ export function ShowDetailPage() {
         <EpisodeList
           anilistId={show.anilistId}
           episodes={show.episodes}
+          defaultDuration={show.episodeDurationMin}
           onBumpWatch={handleBumpWatch}
           onMarkThrough={markThrough}
+          onSetSeasonWatchCount={setSeasonWatchCount}
+          onSetSeasonDuration={setSeasonDuration}
         />
       )}
 

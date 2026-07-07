@@ -24,6 +24,19 @@ function groupBySeasons(episodes: Episode[]): { season: number | null; episodes:
   return groups
 }
 
+/** The season's watch count is however many passes *every* episode in it has
+ * had at least — selecting a new value in the dropdown bulk-sets all of
+ * them, same idea as the show-level bulk stepper but scoped to one season. */
+function seasonWatchCount(episodes: Episode[]): number {
+  return episodes.length ? Math.min(...episodes.map((e) => e.watchCount)) : 0
+}
+
+/** Null when episodes in the season have mixed/unset durations. */
+function seasonDuration(episodes: Episode[]): number | null {
+  const first = episodes[0]?.durationMin ?? null
+  return episodes.every((e) => (e.durationMin ?? null) === first) ? first : null
+}
+
 /** A single running count per episode: 0 = unwatched, 1 = watched, 2+ = rewatched. */
 function WatchStepper({ ep, onBump }: { ep: Episode; onBump: (delta: number) => void }) {
   return (
@@ -39,26 +52,80 @@ function WatchStepper({ ep, onBump }: { ep: Episode; onBump: (delta: number) => 
   )
 }
 
-function SeasonHeader({ season, episodes }: { season: number | null; episodes: Episode[] }) {
+function SeasonHeader({
+  season,
+  episodes,
+  defaultDuration,
+  onSetWatchCount,
+  onSetDuration,
+}: {
+  season: number | null
+  episodes: Episode[]
+  defaultDuration: number | null
+  onSetWatchCount: (season: number, count: number) => void
+  onSetDuration: (season: number, minutes: number) => void
+}) {
   if (season == null) return null
   const watched = episodes.filter((e) => e.watchCount > 0).length
+  const watchCount = seasonWatchCount(episodes)
+  const duration = seasonDuration(episodes)
+
   return (
-    <p className="mb-1.5 mt-3 text-xs font-semibold text-text-muted first:mt-0">
-      Season {season} <span className="font-normal text-text-faint">({watched}/{episodes.length})</span>
-    </p>
+    <div className="mb-1.5 mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 first:mt-0">
+      <p className="text-xs font-semibold text-text-muted">
+        Season {season} <span className="font-normal text-text-faint">({watched}/{episodes.length})</span>
+      </p>
+      <div className="flex items-center gap-3 text-[11px] text-text-faint">
+        <label className="flex items-center gap-1">
+          Watches
+          <select
+            value={watchCount}
+            onChange={(e) => onSetWatchCount(season, Number(e.target.value))}
+            className="rounded border border-border bg-bg px-1 py-0.5 text-text"
+          >
+            {Array.from({ length: 11 }, (_, n) => n).map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1">
+          Min/ep
+          <input
+            key={`${season}-${duration ?? 'mixed'}`}
+            type="number"
+            min={1}
+            defaultValue={duration ?? undefined}
+            placeholder={defaultDuration != null ? String(defaultDuration) : '—'}
+            onBlur={(e) => {
+              const value = Number(e.target.value)
+              if (value > 0) onSetDuration(season, value)
+            }}
+            className="w-14 rounded border border-border bg-bg px-1 py-0.5 text-text"
+          />
+        </label>
+      </div>
+    </div>
   )
 }
 
 export function EpisodeList({
   anilistId,
   episodes,
+  defaultDuration,
   onBumpWatch,
   onMarkThrough,
+  onSetSeasonWatchCount,
+  onSetSeasonDuration,
 }: {
   anilistId: number | null
   episodes: Episode[]
+  defaultDuration: number | null
   onBumpWatch: (ep: Episode, delta: number) => void
   onMarkThrough: (number: number) => void
+  onSetSeasonWatchCount: (season: number, count: number) => void
+  onSetSeasonDuration: (season: number, minutes: number) => void
 }) {
   const [view, setView] = useState<ViewMode>('list')
   const [streaming, setStreaming] = useState<StreamingEpisode[] | null>(null)
@@ -103,7 +170,13 @@ export function EpisodeList({
         <div>
           {seasonGroups.map((group) => (
             <div key={group.season ?? 'all'}>
-              <SeasonHeader season={group.season} episodes={group.episodes} />
+              <SeasonHeader
+                season={group.season}
+                episodes={group.episodes}
+                defaultDuration={defaultDuration}
+                onSetWatchCount={onSetSeasonWatchCount}
+                onSetDuration={onSetSeasonDuration}
+              />
               <div className="space-y-1.5">
                 {group.episodes.map((ep) => {
                   const stream = streaming?.[ep.number - 1]
@@ -148,7 +221,13 @@ export function EpisodeList({
         <>
           {seasonGroups.map((group) => (
             <div key={group.season ?? 'all'}>
-              <SeasonHeader season={group.season} episodes={group.episodes} />
+              <SeasonHeader
+                season={group.season}
+                episodes={group.episodes}
+                defaultDuration={defaultDuration}
+                onSetWatchCount={onSetSeasonWatchCount}
+                onSetDuration={onSetSeasonDuration}
+              />
               <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-12">
                 {group.episodes.map((ep) => (
                   <button

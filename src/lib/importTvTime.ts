@@ -27,6 +27,7 @@ function buildEpisodes(totalEpisodes: number | null, episodesSeen: number): Epis
       seasonNumber: null,
       watchCount: n <= episodesSeen ? 1 : 0,
       watchDates: [],
+      durationMin: null,
     })
   }
   return episodes

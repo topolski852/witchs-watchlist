@@ -14,6 +14,7 @@ interface LegacyEpisode {
   rewatchDates?: string[]
   watchCount?: number
   watchDates?: string[]
+  durationMin?: number | null
 }
 
 interface LegacyShow {
@@ -30,11 +31,12 @@ function migrateEpisode(ep: LegacyEpisode): Episode {
       seasonNumber: ep.seasonNumber,
       watchCount: ep.watchCount,
       watchDates: ep.watchDates ?? [],
+      durationMin: ep.durationMin ?? null,
     }
   }
   const watchCount = (ep.watched ? 1 : 0) + (ep.rewatchCount ?? 0)
   const watchDates = ep.watchedAt ? [ep.watchedAt, ...(ep.rewatchDates ?? [])] : (ep.rewatchDates ?? [])
-  return { number: ep.number, seasonNumber: ep.seasonNumber, watchCount, watchDates }
+  return { number: ep.number, seasonNumber: ep.seasonNumber, watchCount, watchDates, durationMin: null }
 }
 
 /** True if this show still uses the pre-v2 watched/rewatchCount shape. */

@@ -11,10 +11,10 @@ export interface WatchTimeMinutes {
  * rewatch time = every watch after the first (watchCount - 1)
  */
 export function showWatchTime(show: Show): WatchTimeMinutes {
-  const duration = show.episodeDurationMin ?? 0
   let newMinutes = 0
   let rewatchMinutes = 0
   for (const ep of show.episodes) {
+    const duration = ep.durationMin ?? show.episodeDurationMin ?? 0
     if (ep.watchCount > 0) newMinutes += duration
     rewatchMinutes += Math.max(0, ep.watchCount - 1) * duration
   }
