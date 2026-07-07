@@ -27,7 +27,11 @@ export default defineConfig({
       },
       includeAssets: ['icons/icon.svg', 'favicon.ico'],
       manifest: {
-        id: '/',
+        // id must resolve within scope (it's resolved relative to the manifest
+        // URL, not start_url) — leaving it as '/' pointed outside '/witchs-watchlist/'
+        // and made Chromium browsers reject the full "install as app" flow,
+        // silently falling back to a plain browser-tab shortcut instead.
+        id: base,
         name: "The Witch's Watchlist",
         short_name: 'Watchlist',
         description: 'A personal anime tracker',
