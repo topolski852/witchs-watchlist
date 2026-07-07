@@ -125,6 +125,13 @@ export async function buildImportPlan(
   }
 
   const showByTitle = new Map(shows.map((s) => [s.title, s]))
+  // TV Time's raw title ("Frieren") often doesn't match AniList's resolved
+  // title ("Frieren: Beyond Journey's End") as a plain string, so the title
+  // lookup above misses even when the show is already in the list — anilistId
+  // is the reliable key once a fresh search below re-resolves the same entry.
+  const showByAnilistId = new Map(
+    shows.filter((s): s is Show & { anilistId: number } => s.anilistId != null).map((s) => [s.anilistId, s]),
+  )
 
   async function resolveFavoriteEntries(
     refs: RawFavoriteRef[],
@@ -157,6 +164,21 @@ export async function buildImportPlan(
         matched = await matchOne(name)
         matchCache.set(name, matched)
       }
+
+      const linkedByAnilistId = matched ? showByAnilistId.get(matched.id) : undefined
+      if (linkedByAnilistId) {
+        entries.push({
+          id: uuid(),
+          title: linkedByAnilistId.title,
+          coverUrl: linkedByAnilistId.coverUrl,
+          anilistId: linkedByAnilistId.anilistId,
+          type: 'anime',
+          linkedShowId: linkedByAnilistId.id,
+          createdAt: now,
+        })
+        continue
+      }
+
       entries.push({
         id: uuid(),
         title: matched ? bestTitle(matched) : name,

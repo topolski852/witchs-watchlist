@@ -10,10 +10,11 @@ import { ImportReview } from './ImportReview'
 type InputWithDirectory = HTMLInputElement & { webkitdirectory?: boolean }
 
 export function DataPage() {
-  const { shows, customLists, refresh, commitImportPlan, saveShow } = useData()
+  const { shows, customLists, refresh, commitImportPlan, saveShow, saveCustomList } = useData()
   const [backups, setBackups] = useState<Awaited<ReturnType<typeof db.listBackups>>>([])
   const [confirmWipeImport, setConfirmWipeImport] = useState<File | null>(null)
   const [confirmRecalculate, setConfirmRecalculate] = useState(false)
+  const [confirmRelink, setConfirmRelink] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -82,6 +83,45 @@ export function DataPage() {
       changed > 0
         ? `Recalculated statuses — ${changed} show${changed === 1 ? '' : 's'} updated from episode progress.`
         : 'Recalculated statuses — everything already matched episode progress.',
+    )
+    loadBackups()
+  }
+
+  async function relinkFavorites() {
+    setConfirmRelink(false)
+    setError(null)
+    await db.exportSnapshot('pre-relink-favorites snapshot')
+
+    // TV Time's raw favorite-list title often doesn't match AniList's
+    // resolved show title as a plain string (e.g. "Frieren" vs "Frieren:
+    // Beyond Journey's End"), so entries can end up with no linkedShowId
+    // even though the show is already in the watchlist. Re-check by AniList
+    // id first (reliable), then by normalized title as a fallback.
+    const showByAnilistId = new Map(shows.filter((s) => s.anilistId != null).map((s) => [s.anilistId, s]))
+    const showByTitle = new Map(shows.map((s) => [s.title.trim().toLowerCase(), s]))
+
+    let changedEntries = 0
+    for (const list of customLists) {
+      let listChanged = false
+      const entries = list.entries.map((entry) => {
+        if (entry.linkedShowId) return entry
+        const match =
+          (entry.anilistId != null ? showByAnilistId.get(entry.anilistId) : undefined) ??
+          showByTitle.get(entry.title.trim().toLowerCase())
+        if (!match) return entry
+        listChanged = true
+        changedEntries++
+        return { ...entry, linkedShowId: match.id }
+      })
+      if (listChanged) {
+        await saveCustomList({ ...list, entries, updatedAt: new Date().toISOString() })
+      }
+    }
+
+    setStatus(
+      changedEntries > 0
+        ? `Relinked ${changedEntries} favorite entr${changedEntries === 1 ? 'y' : 'ies'} to shows already in your watchlist.`
+        : 'Relinked favorites — nothing needed fixing.',
     )
     loadBackups()
   }
@@ -210,6 +250,19 @@ export function DataPage() {
         >
           Recalculate all statuses
         </button>
+
+        <p className="mb-2 mt-4 text-xs text-text-faint">
+          Re-link Favorite list entries to shows already in your watchlist. TV Time's title for a favorite doesn't
+          always match AniList's resolved title, so some entries (e.g. "Frieren") may never have gotten linked even
+          though the show is already tracked — this fixes those without touching entries that are correct.
+        </p>
+        <button
+          type="button"
+          onClick={() => setConfirmRelink(true)}
+          className="rounded-lg border border-border px-3 py-2 text-sm text-text-muted hover:bg-surface"
+        >
+          Relink favorite entries
+        </button>
       </section>
 
       <section>
@@ -288,6 +341,15 @@ export function DataPage() {
         confirmLabel="Recalculate"
         onCancel={() => setConfirmRecalculate(false)}
         onConfirm={recalculateStatuses}
+      />
+
+      <ConfirmDialog
+        open={confirmRelink}
+        title="Relink favorite entries?"
+        message="Checks every Favorite list entry that isn't linked to a show yet, and links it if a matching show is already in your watchlist (by AniList id, then by title). A backup snapshot is taken first, and entries that are already linked or that don't match anything are left alone."
+        confirmLabel="Relink"
+        onCancel={() => setConfirmRelink(false)}
+        onConfirm={relinkFavorites}
       />
 
       <ConfirmDialog
