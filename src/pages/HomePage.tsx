@@ -3,10 +3,11 @@ import { useData } from '../store/useData'
 import { ShelfRow, type ShelfItem } from '../components/ShelfRow'
 import { formatDurationParts, totalWatchTime } from '../lib/watchTime'
 
-function lastWatchedAt(show: { episodes: { watchedAt: string | null }[] }): string | null {
+function lastWatchedAt(show: { episodes: { watchDates: string[] }[] }): string | null {
   let latest: string | null = null
   for (const ep of show.episodes) {
-    if (ep.watchedAt && (!latest || ep.watchedAt > latest)) latest = ep.watchedAt
+    const epLatest = ep.watchDates[ep.watchDates.length - 1]
+    if (epLatest && (!latest || epLatest > latest)) latest = epLatest
   }
   return latest
 }
@@ -17,7 +18,7 @@ export function HomePage() {
   const time = useMemo(() => totalWatchTime(shows), [shows])
   const duration = useMemo(() => formatDurationParts(time.totalMinutes), [time])
   const episodesWatched = useMemo(
-    () => shows.reduce((sum, s) => sum + s.episodes.filter((e) => e.watched).length, 0),
+    () => shows.reduce((sum, s) => sum + s.episodes.filter((e) => e.watchCount > 0).length, 0),
     [shows],
   )
 

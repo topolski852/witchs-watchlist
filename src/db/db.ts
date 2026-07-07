@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { CustomList, DataExport, Meta, Show } from '../types/schema'
 import { SCHEMA_VERSION } from '../types/schema'
+import { migrateShow } from '../lib/legacyMigration'
 
 const DB_NAME = 'witchs-watchlist'
 const DB_VERSION = 1
@@ -167,7 +168,15 @@ function migrate(raw: DataExport): DataExport {
       `This backup was made with a newer version of the app (schema v${raw.schemaVersion}). Update the app before importing it.`,
     )
   }
-  // No migrations needed yet — v1 is the first schema version.
+  if (raw.schemaVersion < 2) {
+    // v1 -> v2: episodes/shows tracked watched + rewatchCount separately;
+    // now it's a single running watchCount (see lib/legacyMigration.ts).
+    return {
+      ...raw,
+      schemaVersion: SCHEMA_VERSION,
+      data: { ...raw.data, shows: raw.data.shows.map(migrateShow) },
+    }
+  }
   return raw
 }
 

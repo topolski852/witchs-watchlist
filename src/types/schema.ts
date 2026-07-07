@@ -16,10 +16,10 @@ export const WATCH_STATUSES: { value: WatchStatus; label: string }[] = [
 export interface Episode {
   number: number
   seasonNumber: number | null
-  watched: boolean
-  watchedAt: string | null
-  rewatchCount: number
-  rewatchDates: string[]
+  /** Running total times watched: 0 = never watched, 1 = watched once, 2 = watched twice, etc. */
+  watchCount: number
+  /** One entry per watch, in order — watchDates.length === watchCount. */
+  watchDates: string[]
 }
 
 export interface Show {
@@ -36,7 +36,8 @@ export interface Show {
    * known episode means "Completed" or "Caught Up" (more is coming). */
   hasSequel: boolean
   status: WatchStatus
-  rewatchCount: number
+  /** Running total times the whole show has been watched (0 = never fully watched). */
+  watchCount: number
   episodes: Episode[]
   needsReview: boolean
   reviewNote: string | null
@@ -74,7 +75,7 @@ export interface Meta {
   lastImportAt: string | null
 }
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export interface DataExport {
   schemaVersion: number

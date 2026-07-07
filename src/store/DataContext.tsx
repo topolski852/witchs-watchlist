@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import * as db from '../db/db'
 import type { CustomList, Show } from '../types/schema'
 import { DataContext } from './dataContextBase'
+import { isLegacyShow, migrateShow } from '../lib/legacyMigration'
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [shows, setShows] = useState<Show[]>([])
@@ -9,7 +10,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
-    const [s, l] = await Promise.all([db.getAllShows(), db.getAllCustomLists()])
+    const [rawShows, l] = await Promise.all([db.getAllShows(), db.getAllCustomLists()])
+
+    // One-time migration for shows already sitting in IndexedDB from before
+    // the watchCount schema change (v2) — db.ts's migrate() only runs on
+    // JSON import, not on data already stored locally.
+    let s = rawShows
+    if (rawShows.some(isLegacyShow)) {
+      await db.exportSnapshot('pre-watchcount-migration')
+      s = rawShows.map(migrateShow)
+      await db.putShows(s)
+    }
+
     setShows(s)
     setCustomLists(l)
     setLoading(false)

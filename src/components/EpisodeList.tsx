@@ -15,13 +15,14 @@ function episodeTitle(ep: Episode, streaming: StreamingEpisode | undefined): str
   return dashSplit ? dashSplit[1] : raw
 }
 
-function RewatchStepper({ ep, onBump }: { ep: Episode; onBump: (delta: number) => void }) {
+/** A single running count per episode: 0 = unwatched, 1 = watched, 2+ = rewatched. */
+function WatchStepper({ ep, onBump }: { ep: Episode; onBump: (delta: number) => void }) {
   return (
     <div className="flex shrink-0 items-center gap-1 text-xs text-text-muted">
       <button type="button" onClick={() => onBump(-1)} className="rounded border border-border px-1.5 hover:text-text">
         −
       </button>
-      <span className="w-3 text-center text-text">{ep.rewatchCount}</span>
+      <span className="w-3 text-center text-text">{ep.watchCount}</span>
       <button type="button" onClick={() => onBump(1)} className="rounded border border-border px-1.5 hover:text-text">
         +
       </button>
@@ -32,15 +33,13 @@ function RewatchStepper({ ep, onBump }: { ep: Episode; onBump: (delta: number) =
 export function EpisodeList({
   anilistId,
   episodes,
-  onToggleWatched,
+  onBumpWatch,
   onMarkThrough,
-  onBumpRewatch,
 }: {
   anilistId: number | null
   episodes: Episode[]
-  onToggleWatched: (ep: Episode) => void
+  onBumpWatch: (ep: Episode, delta: number) => void
   onMarkThrough: (number: number) => void
-  onBumpRewatch: (ep: Episode, delta: number) => void
 }) {
   const [view, setView] = useState<ViewMode>('list')
   const [streaming, setStreaming] = useState<StreamingEpisode[] | null>(null)
@@ -53,7 +52,7 @@ export function EpisodeList({
       .catch(() => setStreaming([]))
   }, [anilistId])
 
-  const watchedCount = episodes.filter((e) => e.watched).length
+  const watchedCount = episodes.filter((e) => e.watchCount > 0).length
   const selectedEp = episodes.find((e) => e.number === selected) ?? null
 
   return (
@@ -88,14 +87,14 @@ export function EpisodeList({
               <div
                 key={ep.number}
                 className={`flex items-center gap-2.5 rounded-lg border p-1.5 ${
-                  ep.watched ? 'border-accent-soft/50 bg-accent-muted/30' : 'border-border'
+                  ep.watchCount > 0 ? 'border-accent-soft/50 bg-accent-muted/30' : 'border-border'
                 }`}
               >
                 <button
                   type="button"
-                  onClick={() => onToggleWatched(ep)}
+                  onClick={() => onBumpWatch(ep, 1)}
                   className="shrink-0"
-                  aria-label={ep.watched ? 'Mark unwatched' : 'Mark watched'}
+                  aria-label="Add a watch"
                 >
                   {stream?.thumbnail ? (
                     <CoverImage src={stream.thumbnail} alt="" className="h-11 w-20 rounded-md" />
@@ -109,17 +108,11 @@ export function EpisodeList({
                   <p className="truncate text-xs font-medium text-text">
                     {ep.number}. {episodeTitle(ep, stream)}
                   </p>
-                  <label className="flex items-center gap-1.5 text-[11px] text-text-faint">
-                    <input
-                      type="checkbox"
-                      checked={ep.watched}
-                      onChange={() => onToggleWatched(ep)}
-                      className="h-3.5 w-3.5 accent-accent"
-                    />
-                    Watched
-                  </label>
+                  <p className="text-[11px] text-text-faint">
+                    {ep.watchCount === 0 ? 'Not watched' : `Watched ${ep.watchCount}×`}
+                  </p>
                 </div>
-                <RewatchStepper ep={ep} onBump={(d) => onBumpRewatch(ep, d)} />
+                <WatchStepper ep={ep} onBump={(d) => onBumpWatch(ep, d)} />
               </div>
             )
           })}
@@ -133,15 +126,15 @@ export function EpisodeList({
                 type="button"
                 onClick={() => setSelected(ep.number)}
                 className={`relative aspect-square rounded-md border text-[11px] font-medium transition-colors ${
-                  ep.watched
+                  ep.watchCount > 0
                     ? 'border-accent bg-accent-muted text-text'
                     : 'border-border text-text-faint hover:border-accent-soft'
                 } ${selected === ep.number ? 'ring-2 ring-accent' : ''}`}
               >
                 {ep.number}
-                {ep.rewatchCount > 0 && (
+                {ep.watchCount > 1 && (
                   <span className="absolute -bottom-1 -right-1 rounded-full bg-accent px-1 text-[9px] text-white">
-                    {ep.rewatchCount}
+                    {ep.watchCount}
                   </span>
                 )}
               </button>
@@ -156,16 +149,11 @@ export function EpisodeList({
                   <CloseIcon className="h-4 w-4" />
                 </button>
               </div>
-              <label className="mt-2 flex items-center gap-2 text-sm text-text-muted">
-                <input
-                  type="checkbox"
-                  checked={selectedEp.watched}
-                  onChange={() => onToggleWatched(selectedEp)}
-                  className="h-4 w-4 accent-accent"
-                />
-                Watched
-              </label>
-              {!selectedEp.watched && selectedEp.number > 1 && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-text-muted">
+                Watch count
+                <WatchStepper ep={selectedEp} onBump={(d) => onBumpWatch(selectedEp, d)} />
+              </div>
+              {selectedEp.watchCount === 0 && selectedEp.number > 1 && (
                 <button
                   type="button"
                   onClick={() => onMarkThrough(selectedEp.number)}
@@ -174,10 +162,6 @@ export function EpisodeList({
                   Mark episodes 1–{selectedEp.number} watched
                 </button>
               )}
-              <div className="mt-3 flex items-center gap-2 text-sm text-text-muted">
-                Rewatch count
-                <RewatchStepper ep={selectedEp} onBump={(d) => onBumpRewatch(selectedEp, d)} />
-              </div>
             </div>
           )}
         </>

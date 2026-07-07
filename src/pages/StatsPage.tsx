@@ -17,7 +17,7 @@ export function StatsPage() {
 
   const time = useMemo(() => totalWatchTime(shows), [shows])
   const episodesWatched = useMemo(
-    () => shows.reduce((sum, s) => sum + s.episodes.filter((e) => e.watched).length, 0),
+    () => shows.reduce((sum, s) => sum + s.episodes.filter((e) => e.watchCount > 0).length, 0),
     [shows],
   )
   const byStatus = useMemo(
@@ -31,7 +31,7 @@ export function StatsPage() {
   const mostRewatched = useMemo(
     () =>
       [...shows]
-        .filter((s) => s.rewatchCount > 0 || s.episodes.some((e) => e.rewatchCount > 0))
+        .filter((s) => s.watchCount > 1 || s.episodes.some((e) => e.watchCount > 1))
         .sort((a, b) => showWatchTime(b).rewatchMinutes - showWatchTime(a).rewatchMinutes)
         .slice(0, 5),
     [shows],

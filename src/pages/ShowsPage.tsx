@@ -49,10 +49,8 @@ export function ShowsPage() {
     const episodes: Episode[] = Array.from({ length: media.episodes ?? 0 }, (_, i) => ({
       number: i + 1,
       seasonNumber: null,
-      watched: false,
-      watchedAt: null,
-      rewatchCount: 0,
-      rewatchDates: [],
+      watchCount: 0,
+      watchDates: [],
     }))
     const show: Show = {
       id: uuid(),
@@ -66,7 +64,7 @@ export function ShowsPage() {
       episodeDurationMin: media.duration,
       hasSequel: hasSequelRelation(media),
       status: 'plan_to_watch',
-      rewatchCount: 0,
+      watchCount: 0,
       episodes,
       needsReview: false,
       reviewNote: null,

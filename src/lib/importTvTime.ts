@@ -25,10 +25,8 @@ function buildEpisodes(totalEpisodes: number | null, episodesSeen: number): Epis
     episodes.push({
       number: n,
       seasonNumber: null,
-      watched: n <= episodesSeen,
-      watchedAt: null,
-      rewatchCount: 0,
-      rewatchDates: [],
+      watchCount: n <= episodesSeen ? 1 : 0,
+      watchDates: [],
     })
   }
   return episodes
@@ -71,13 +69,15 @@ export async function buildImportPlan(
 
     const rewatchEpisodes = data.rewatchByShowName.get(raw.name) ?? []
     const episodes = buildEpisodes(matched?.episodes ?? null, raw.episodesSeen)
-    let showRewatchCount = 0
+    let showWatchCount = 0
     for (const rw of rewatchEpisodes) {
       const ep = episodes.find((e) => e.number === rw.episodeNumber)
       if (ep) {
-        ep.rewatchCount = rw.count
-        ep.rewatchDates = [rw.updatedAt]
-        showRewatchCount = Math.max(showRewatchCount, rw.count)
+        // rw.count is TV Time's rewatch tally (repeat views beyond the first) —
+        // the running count is that plus the first watch itself.
+        ep.watchCount = Math.max(1, ep.watchCount) + rw.count
+        ep.watchDates = [rw.updatedAt]
+        showWatchCount = Math.max(showWatchCount, rw.count)
       }
     }
 
@@ -113,7 +113,7 @@ export async function buildImportPlan(
       episodeDurationMin: matched?.duration ?? null,
       hasSequel,
       status,
-      rewatchCount: showRewatchCount,
+      watchCount: showWatchCount,
       episodes,
       needsReview: !matched || rewatchEpisodes.length > 0,
       reviewNote: notes.length > 0 ? notes.join(' ') : null,

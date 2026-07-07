@@ -21,7 +21,7 @@ export function deriveWatchStatus(
   if (currentStatus === 'stopped') return 'stopped'
   const total = episodes.length
   if (total === 0) return currentStatus
-  const watchedCount = episodes.filter((e) => e.watched).length
+  const watchedCount = episodes.filter((e) => e.watchCount > 0).length
   if (watchedCount === 0) return 'plan_to_watch'
   if (watchedCount === total) return hasSequel ? 'caught_up' : 'completed'
   return 'watching'

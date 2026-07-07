@@ -5,7 +5,7 @@ import { StatusBadge } from './StatusBadge'
 import { FlagIcon } from './icons'
 
 export function ShowRow({ show }: { show: Show }) {
-  const watchedCount = show.episodes.filter((e) => e.watched).length
+  const watchedCount = show.episodes.filter((e) => e.watchCount > 0).length
   const total = show.totalEpisodes ?? show.episodes.length
   const pct = total > 0 ? Math.round((watchedCount / total) * 100) : 0
 
@@ -33,7 +33,7 @@ export function ShowRow({ show }: { show: Show }) {
           <p className="line-clamp-2 text-sm font-medium leading-tight text-text">{show.title}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <StatusBadge status={show.status} />
-            {show.rewatchCount > 0 && <span className="text-[11px] text-accent">×{show.rewatchCount + 1}</span>}
+            {show.watchCount > 1 && <span className="text-[11px] text-accent">×{show.watchCount}</span>}
             {show.needsReview && (
               <span title="Needs review">
                 <FlagIcon className="h-3 w-3 text-status-stopped" />

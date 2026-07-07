@@ -46,55 +46,59 @@ export function ShowDetailPage() {
     update({ episodes, status })
   }
 
-  function updateEpisode(number: number, patch: Partial<Episode>) {
-    if (!show) return
-    applyEpisodes(show.episodes.map((e) => (e.number === number ? { ...e, ...patch } : e)))
-  }
-
   // extraPatch lets "Never" set skipMarkThroughPrompt in the same update as
   // the episode change — two separate update() calls back to back would both
   // close over the same stale `show`, so the second would clobber the first.
-  function markWatchedSingle(number: number, extraPatch: Partial<typeof show> = {}) {
+  function bumpWatch(ep: Episode, delta: number, extraPatch: Partial<typeof show> = {}) {
     if (!show) return
-    const episodes = show.episodes.map((e) =>
-      e.number === number ? { ...e, watched: true, watchedAt: new Date().toISOString() } : e,
-    )
+    const now = new Date().toISOString()
+    const episodes = show.episodes.map((e) => {
+      if (e.number !== ep.number) return e
+      const watchCount = Math.max(0, e.watchCount + delta)
+      const watchDates = delta > 0 ? [...e.watchDates, now] : delta < 0 ? e.watchDates.slice(0, -1) : e.watchDates
+      return { ...e, watchCount, watchDates }
+    })
     const status = deriveWatchStatus(episodes, show.hasSequel, show.status)
     update({ episodes, status, ...extraPatch })
   }
 
-  function toggleWatched(ep: Episode) {
+  // Only a genuine 0->1 "first watch" with an earlier gap prompts — rewatch
+  // bumps (1->2+) and un-watching (any decrement) never do.
+  function handleBumpWatch(ep: Episode, delta: number) {
     if (!show) return
-    if (ep.watched) {
-      // un-watching never prompts — only forward progress does
-      updateEpisode(ep.number, { watched: false })
-      return
+    if (delta > 0 && ep.watchCount === 0) {
+      const hasEarlierGap = show.episodes.some((e) => e.number < ep.number && e.watchCount === 0)
+      if (hasEarlierGap && !show.skipMarkThroughPrompt) {
+        setPendingMarkThrough(ep.number)
+        return
+      }
     }
-    const hasEarlierGap = show.episodes.some((e) => e.number < ep.number && !e.watched)
-    if (hasEarlierGap && !show.skipMarkThroughPrompt) {
-      setPendingMarkThrough(ep.number)
-      return
-    }
-    markWatchedSingle(ep.number)
+    bumpWatch(ep, delta)
   }
 
   function markThrough(number: number) {
     if (!show) return
+    const now = new Date().toISOString()
     applyEpisodes(
       show.episodes.map((e) =>
-        e.number <= number && !e.watched
-          ? { ...e, watched: true, watchedAt: new Date().toISOString() }
-          : e,
+        e.number <= number && e.watchCount === 0 ? { ...e, watchCount: 1, watchDates: [...e.watchDates, now] } : e,
       ),
     )
   }
 
-  function bumpEpisodeRewatch(ep: Episode, delta: number) {
-    const next = Math.max(0, ep.rewatchCount + delta)
-    updateEpisode(ep.number, {
-      rewatchCount: next,
-      rewatchDates: delta > 0 ? [...ep.rewatchDates, new Date().toISOString()] : ep.rewatchDates,
+  // The show-level counter is a deliberate bulk action, not a computed
+  // aggregate: bumping it applies the same delta to every episode at once
+  // (e.g. "+" = I rewatched the whole thing).
+  function bumpShowWatch(delta: number) {
+    if (!show) return
+    const now = new Date().toISOString()
+    const episodes = show.episodes.map((e) => {
+      const watchCount = Math.max(0, e.watchCount + delta)
+      const watchDates = delta > 0 ? [...e.watchDates, now] : delta < 0 ? e.watchDates.slice(0, -1) : e.watchDates
+      return { ...e, watchCount, watchDates }
     })
+    const status = deriveWatchStatus(episodes, show.hasSequel, show.status)
+    update({ watchCount: Math.max(0, show.watchCount + delta), episodes, status })
   }
 
   return (
@@ -209,24 +213,17 @@ export function ShowDetailPage() {
         </label>
 
         <div className="text-xs text-text-faint">
-          Full rewatches
+          Watch Count
           <div className="mt-1 flex items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5">
-            <button
-              type="button"
-              onClick={() => update({ rewatchCount: Math.max(0, show.rewatchCount - 1) })}
-              className="text-text-muted hover:text-text"
-            >
+            <button type="button" onClick={() => bumpShowWatch(-1)} className="text-text-muted hover:text-text">
               −
             </button>
-            <span className="flex-1 text-center text-sm text-text">{show.rewatchCount}</span>
-            <button
-              type="button"
-              onClick={() => update({ rewatchCount: show.rewatchCount + 1 })}
-              className="text-text-muted hover:text-text"
-            >
+            <span className="flex-1 text-center text-sm text-text">{show.watchCount}</span>
+            <button type="button" onClick={() => bumpShowWatch(1)} className="text-text-muted hover:text-text">
               +
             </button>
           </div>
+          <p className="mt-1 text-[11px] text-text-faint">+/- rewatches the whole show, episode by episode</p>
         </div>
       </div>
 
@@ -253,9 +250,8 @@ export function ShowDetailPage() {
         <EpisodeList
           anilistId={show.anilistId}
           episodes={show.episodes}
-          onToggleWatched={toggleWatched}
+          onBumpWatch={handleBumpWatch}
           onMarkThrough={markThrough}
-          onBumpRewatch={bumpEpisodeRewatch}
         />
       )}
 
@@ -296,13 +292,13 @@ export function ShowDetailPage() {
           setPendingMarkThrough(null)
         }}
         onNo={() => {
-          if (pendingMarkThrough !== null) markWatchedSingle(pendingMarkThrough)
+          const ep = show.episodes.find((e) => e.number === pendingMarkThrough)
+          if (ep) bumpWatch(ep, 1)
           setPendingMarkThrough(null)
         }}
         onNever={() => {
-          if (pendingMarkThrough !== null) {
-            markWatchedSingle(pendingMarkThrough, { skipMarkThroughPrompt: true })
-          }
+          const ep = show.episodes.find((e) => e.number === pendingMarkThrough)
+          if (ep) bumpWatch(ep, 1, { skipMarkThroughPrompt: true })
           setPendingMarkThrough(null)
         }}
       />
