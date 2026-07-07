@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0f0a1a;
+  --color-surface: #1a1329;
+  --color-surface-raised: #241b38;
+  --color-border: #362a4d;
+  --color-accent: #a06ee8;
+  --color-accent-hover: #b489ee;
+  --color-accent-soft: #7a4fce;
+  --color-accent-muted: #4a2a86;
+  --color-text: #f0e9fb;
+  --color-text-muted: #b4a6cf;
+  --color-text-faint: #7c6d94;
+
+  --color-status-watching: #a06ee8;
+  --color-status-caught-up: #4fc0c0;
+  --color-status-completed: #6bce8a;
+  --color-status-stopped: #d97a7a;
+  --color-status-plan: #7c6d94;
+
+  --font-display: "Georgia", "Iowan Old Style", serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(160, 110, 232, 0.18), transparent),
+    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(122, 79, 206, 0.12), transparent);
+  background-attachment: fixed;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+::selection {
+  background-color: var(--color-accent-muted);
+  color: var(--color-text);
+}
+
+/* Thin, unobtrusive scrollbars fit the theme better than default chrome ones */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
