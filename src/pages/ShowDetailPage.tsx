@@ -5,6 +5,7 @@ import { CoverImage } from '../components/CoverImage'
 import { StatusBadge } from '../components/StatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { AboutSection } from '../components/AboutSection'
+import { EpisodeList } from '../components/EpisodeList'
 import { WATCH_STATUSES, type Episode, type WatchStatus } from '../types/schema'
 import { showWatchTime, formatMinutes } from '../lib/watchTime'
 import { deriveWatchStatus } from '../lib/statusRules'
@@ -15,7 +16,6 @@ export function ShowDetailPage() {
   const { shows, saveShow, removeShow } = useData()
   const show = shows.find((s) => s.id === id)
 
-  const [selected, setSelected] = useState<number | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [customCoverDraft, setCustomCoverDraft] = useState(show?.customCoverUrl ?? '')
 
@@ -74,34 +74,74 @@ export function ShowDetailPage() {
     })
   }
 
-  const selectedEp = show.episodes.find((e) => e.number === selected) ?? null
-  const watchedCount = show.episodes.filter((e) => e.watched).length
-
   return (
     <div className="pb-6">
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="mb-2 text-sm text-text-faint hover:text-text-muted"
-      >
-        ← Back
-      </button>
-
-      <div className="flex gap-4">
-        <CoverImage
-          src={show.customCoverUrl || show.coverUrl}
-          alt={show.title}
-          className="h-40 w-28 shrink-0 rounded-lg border border-border"
-        />
-        <div className="min-w-0 flex-1">
-          <h2 className="font-display text-lg leading-tight text-text">{show.title}</h2>
-          <p className="mt-1 text-xs text-text-faint">
-            {show.format ?? 'Unknown format'} · {show.totalEpisodes ?? '?'} episodes ·{' '}
-            {show.episodeDurationMin ?? '?'} min/ep
-          </p>
-          <div className="mt-2">
-            <StatusBadge status={show.status} />
+      {show.bannerUrl ? (
+        <div className="relative -mx-4 mb-3 h-44 overflow-hidden sm:h-56 sm:rounded-b-xl">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${show.bannerUrl})` }}
+            aria-hidden
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/60 to-bg/10" aria-hidden />
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="absolute left-4 top-[max(0.75rem,env(safe-area-inset-top))] rounded-full bg-bg/70 px-2.5 py-1 text-sm text-text backdrop-blur hover:bg-bg/90"
+          >
+            ← Back
+          </button>
+          <div className="absolute inset-x-4 bottom-3 flex items-end gap-4">
+            <CoverImage
+              src={show.customCoverUrl || show.coverUrl}
+              alt={show.title}
+              className="h-32 w-24 shrink-0 rounded-lg border border-border shadow-lg sm:h-36 sm:w-28"
+            />
+            <div className="min-w-0 flex-1 pb-1">
+              <h2 className="font-display text-lg leading-tight text-text drop-shadow-sm sm:text-xl">
+                {show.title}
+              </h2>
+              <p className="mt-1 text-xs text-text-muted">
+                {show.format ?? 'Unknown format'} · {show.totalEpisodes ?? '?'} episodes ·{' '}
+                {show.episodeDurationMin ?? '?'} min/ep
+              </p>
+              <div className="mt-2">
+                <StatusBadge status={show.status} />
+              </div>
+            </div>
           </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="mb-2 text-sm text-text-faint hover:text-text-muted"
+        >
+          ← Back
+        </button>
+      )}
+
+      <div className={show.bannerUrl ? '' : 'flex gap-4'}>
+        {!show.bannerUrl && (
+          <CoverImage
+            src={show.customCoverUrl || show.coverUrl}
+            alt={show.title}
+            className="h-40 w-28 shrink-0 rounded-lg border border-border"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          {!show.bannerUrl && (
+            <>
+              <h2 className="font-display text-lg leading-tight text-text">{show.title}</h2>
+              <p className="mt-1 text-xs text-text-faint">
+                {show.format ?? 'Unknown format'} · {show.totalEpisodes ?? '?'} episodes ·{' '}
+                {show.episodeDurationMin ?? '?'} min/ep
+              </p>
+              <div className="mt-2">
+                <StatusBadge status={show.status} />
+              </div>
+            </>
+          )}
           {time && (
             <p className="mt-2 text-xs text-text-muted">
               {formatMinutes(time.newMinutes)} watched
@@ -185,81 +225,13 @@ export function ShowDetailPage() {
       </label>
 
       {show.episodes.length > 0 && (
-        <div className="mt-5">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-text">
-              Episodes <span className="text-text-faint">({watchedCount}/{show.episodes.length})</span>
-            </h3>
-          </div>
-          <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-12">
-            {show.episodes.map((ep) => (
-              <button
-                key={ep.number}
-                type="button"
-                onClick={() => setSelected(ep.number)}
-                className={`relative aspect-square rounded-md border text-[11px] font-medium transition-colors ${
-                  ep.watched
-                    ? 'border-accent bg-accent-muted text-text'
-                    : 'border-border text-text-faint hover:border-accent-soft'
-                } ${selected === ep.number ? 'ring-2 ring-accent' : ''}`}
-              >
-                {ep.number}
-                {ep.rewatchCount > 0 && (
-                  <span className="absolute -bottom-1 -right-1 rounded-full bg-accent px-1 text-[9px] text-white">
-                    {ep.rewatchCount}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {selectedEp && (
-            <div className="mt-3 rounded-lg border border-border bg-surface p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-text">Episode {selectedEp.number}</p>
-                <button type="button" onClick={() => setSelected(null)} className="text-text-faint hover:text-text">
-                  ✕
-                </button>
-              </div>
-              <label className="mt-2 flex items-center gap-2 text-sm text-text-muted">
-                <input
-                  type="checkbox"
-                  checked={selectedEp.watched}
-                  onChange={() => toggleWatched(selectedEp)}
-                  className="h-4 w-4 accent-accent"
-                />
-                Watched
-              </label>
-              {!selectedEp.watched && selectedEp.number > 1 && (
-                <button
-                  type="button"
-                  onClick={() => markThrough(selectedEp.number)}
-                  className="mt-2 block text-xs text-accent underline"
-                >
-                  Mark episodes 1–{selectedEp.number} watched
-                </button>
-              )}
-              <div className="mt-3 flex items-center gap-2 text-sm text-text-muted">
-                Rewatch count
-                <button
-                  type="button"
-                  onClick={() => bumpEpisodeRewatch(selectedEp, -1)}
-                  className="rounded border border-border px-2 text-text-muted hover:text-text"
-                >
-                  −
-                </button>
-                <span className="text-text">{selectedEp.rewatchCount}</span>
-                <button
-                  type="button"
-                  onClick={() => bumpEpisodeRewatch(selectedEp, 1)}
-                  className="rounded border border-border px-2 text-text-muted hover:text-text"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <EpisodeList
+          anilistId={show.anilistId}
+          episodes={show.episodes}
+          onToggleWatched={toggleWatched}
+          onMarkThrough={markThrough}
+          onBumpRewatch={bumpEpisodeRewatch}
+        />
       )}
 
       <textarea

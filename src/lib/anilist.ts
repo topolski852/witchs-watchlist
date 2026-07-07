@@ -4,6 +4,7 @@ export interface AniListMedia {
   id: number
   title: { romaji: string | null; english: string | null; native: string | null }
   coverImage: { large: string | null; extraLarge: string | null }
+  bannerImage: string | null
   format: string | null
   status: string | null
   episodes: number | null
@@ -16,6 +17,7 @@ const MEDIA_FIELDS = `
   id
   title { romaji english native }
   coverImage { large extraLarge }
+  bannerImage
   format
   status
   episodes
@@ -172,6 +174,36 @@ export function getAniListDetails(id: number): Promise<AniListDetails | null> {
     const data = await graphql<{ Media: RawDetails | null }>(DETAILS_QUERY, { id })
     if (!data.Media) return null
     return { ...data.Media, studios: data.Media.studios.nodes.map((n) => n.name) }
+  })
+}
+
+export interface StreamingEpisode {
+  title: string | null
+  thumbnail: string | null
+}
+
+const STREAMING_EPISODES_QUERY = `
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    streamingEpisodes { title thumbnail }
+  }
+}`
+
+/**
+ * Per-episode title + thumbnail, sourced from streaming-site listings AniList
+ * aggregates (Crunchyroll etc.) — coverage isn't guaranteed for every show,
+ * and there's no explicit episode-number field, so array order is the best
+ * available signal for which episode a given entry represents. Fetched
+ * lazily (only when a show's episode list is opened), not persisted to the
+ * schema, for the same storage-size reason as getAniListDetails.
+ */
+export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
+  return enqueue(async () => {
+    const data = await graphql<{ Media: { streamingEpisodes: StreamingEpisode[] } | null }>(
+      STREAMING_EPISODES_QUERY,
+      { id },
+    )
+    return data.Media?.streamingEpisodes ?? []
   })
 }
 

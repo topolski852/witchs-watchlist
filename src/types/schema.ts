@@ -27,6 +27,7 @@ export interface Show {
   anilistId: number | null
   title: string
   coverUrl: string | null
+  bannerUrl: string | null
   customCoverUrl: string | null
   format: string | null
   totalEpisodes: number | null

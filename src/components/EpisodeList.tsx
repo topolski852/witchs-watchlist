@@ -1,0 +1,186 @@
+import { useEffect, useState } from 'react'
+import type { Episode } from '../types/schema'
+import { getStreamingEpisodes, type StreamingEpisode } from '../lib/anilist'
+import { CoverImage } from './CoverImage'
+
+type ViewMode = 'list' | 'grid'
+
+function episodeTitle(ep: Episode, streaming: StreamingEpisode | undefined): string {
+  const raw = streaming?.title?.trim()
+  if (!raw) return `Episode ${ep.number}`
+  // Streaming titles often come as "Episode 3 - Actual Title" — keep just the
+  // part after the dash when it's there, since we already show the number.
+  const dashSplit = raw.match(/^Episode\s+\d+\s*[-–]\s*(.+)$/i)
+  return dashSplit ? dashSplit[1] : raw
+}
+
+function RewatchStepper({ ep, onBump }: { ep: Episode; onBump: (delta: number) => void }) {
+  return (
+    <div className="flex shrink-0 items-center gap-1 text-xs text-text-muted">
+      <button type="button" onClick={() => onBump(-1)} className="rounded border border-border px-1.5 hover:text-text">
+        −
+      </button>
+      <span className="w-3 text-center text-text">{ep.rewatchCount}</span>
+      <button type="button" onClick={() => onBump(1)} className="rounded border border-border px-1.5 hover:text-text">
+        +
+      </button>
+    </div>
+  )
+}
+
+export function EpisodeList({
+  anilistId,
+  episodes,
+  onToggleWatched,
+  onMarkThrough,
+  onBumpRewatch,
+}: {
+  anilistId: number | null
+  episodes: Episode[]
+  onToggleWatched: (ep: Episode) => void
+  onMarkThrough: (number: number) => void
+  onBumpRewatch: (ep: Episode, delta: number) => void
+}) {
+  const [view, setView] = useState<ViewMode>('list')
+  const [streaming, setStreaming] = useState<StreamingEpisode[] | null>(null)
+  const [selected, setSelected] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!anilistId) return
+    getStreamingEpisodes(anilistId)
+      .then(setStreaming)
+      .catch(() => setStreaming([]))
+  }, [anilistId])
+
+  const watchedCount = episodes.filter((e) => e.watched).length
+  const selectedEp = episodes.find((e) => e.number === selected) ?? null
+
+  return (
+    <div className="mt-5">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-text">
+          Episodes <span className="text-text-faint">({watchedCount}/{episodes.length})</span>
+        </h3>
+        <div className="flex overflow-hidden rounded-lg border border-border text-xs">
+          <button
+            type="button"
+            onClick={() => setView('list')}
+            className={`px-2 py-1 ${view === 'list' ? 'bg-accent-muted text-text' : 'text-text-faint'}`}
+          >
+            List
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('grid')}
+            className={`px-2 py-1 ${view === 'grid' ? 'bg-accent-muted text-text' : 'text-text-faint'}`}
+          >
+            Grid
+          </button>
+        </div>
+      </div>
+
+      {view === 'list' ? (
+        <div className="space-y-1.5">
+          {episodes.map((ep) => {
+            const stream = streaming?.[ep.number - 1]
+            return (
+              <div
+                key={ep.number}
+                className={`flex items-center gap-2.5 rounded-lg border p-1.5 ${
+                  ep.watched ? 'border-accent-soft/50 bg-accent-muted/30' : 'border-border'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => onToggleWatched(ep)}
+                  className="shrink-0"
+                  aria-label={ep.watched ? 'Mark unwatched' : 'Mark watched'}
+                >
+                  {stream?.thumbnail ? (
+                    <CoverImage src={stream.thumbnail} alt="" className="h-11 w-20 rounded-md" />
+                  ) : (
+                    <div className="flex h-11 w-14 shrink-0 items-center justify-center rounded-md border border-border text-xs text-text-faint">
+                      {ep.number}
+                    </div>
+                  )}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-text">
+                    {ep.number}. {episodeTitle(ep, stream)}
+                  </p>
+                  <label className="flex items-center gap-1.5 text-[11px] text-text-faint">
+                    <input
+                      type="checkbox"
+                      checked={ep.watched}
+                      onChange={() => onToggleWatched(ep)}
+                      className="h-3.5 w-3.5 accent-accent"
+                    />
+                    Watched
+                  </label>
+                </div>
+                <RewatchStepper ep={ep} onBump={(d) => onBumpRewatch(ep, d)} />
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-12">
+            {episodes.map((ep) => (
+              <button
+                key={ep.number}
+                type="button"
+                onClick={() => setSelected(ep.number)}
+                className={`relative aspect-square rounded-md border text-[11px] font-medium transition-colors ${
+                  ep.watched
+                    ? 'border-accent bg-accent-muted text-text'
+                    : 'border-border text-text-faint hover:border-accent-soft'
+                } ${selected === ep.number ? 'ring-2 ring-accent' : ''}`}
+              >
+                {ep.number}
+                {ep.rewatchCount > 0 && (
+                  <span className="absolute -bottom-1 -right-1 rounded-full bg-accent px-1 text-[9px] text-white">
+                    {ep.rewatchCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {selectedEp && (
+            <div className="mt-3 rounded-lg border border-border bg-surface p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-text">Episode {selectedEp.number}</p>
+                <button type="button" onClick={() => setSelected(null)} className="text-text-faint hover:text-text">
+                  ✕
+                </button>
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-sm text-text-muted">
+                <input
+                  type="checkbox"
+                  checked={selectedEp.watched}
+                  onChange={() => onToggleWatched(selectedEp)}
+                  className="h-4 w-4 accent-accent"
+                />
+                Watched
+              </label>
+              {!selectedEp.watched && selectedEp.number > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onMarkThrough(selectedEp.number)}
+                  className="mt-2 block text-xs text-accent underline"
+                >
+                  Mark episodes 1–{selectedEp.number} watched
+                </button>
+              )}
+              <div className="mt-3 flex items-center gap-2 text-sm text-text-muted">
+                Rewatch count
+                <RewatchStepper ep={selectedEp} onBump={(d) => onBumpRewatch(selectedEp, d)} />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

@@ -106,6 +106,7 @@ export async function buildImportPlan(
       anilistId: matched?.id ?? null,
       title: matched ? bestTitle(matched) : raw.name,
       coverUrl: matched?.coverImage.large ?? null,
+      bannerUrl: matched?.bannerImage ?? null,
       customCoverUrl: null,
       format: matched?.format ?? null,
       totalEpisodes: matched?.episodes ?? null,

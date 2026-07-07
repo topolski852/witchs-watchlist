@@ -1,29 +1,47 @@
 import { useMemo, useState } from 'react'
 import { v4 as uuid } from 'uuid'
 import { useData } from '../store/useData'
-import { ShowCard } from '../components/ShowCard'
+import { ShowRow } from '../components/ShowRow'
 import { SearchAniListModal } from '../components/SearchAniListModal'
 import { WATCH_STATUSES, type Episode, type Show, type WatchStatus } from '../types/schema'
 import type { AniListMedia } from '../lib/anilist'
 import { bestTitle, hasSequelRelation } from '../lib/anilist'
 
-const FILTERS: { value: WatchStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  ...WATCH_STATUSES,
-]
+// Home-feed order: active shows first, "done with it" statuses last.
+const SECTION_ORDER: WatchStatus[] = ['watching', 'caught_up', 'plan_to_watch', 'completed', 'stopped']
+const SECTION_LABELS = Object.fromEntries(WATCH_STATUSES.map((s) => [s.value, s.label])) as Record<
+  WatchStatus,
+  string
+>
+// A ~480-show library mostly ends up here over time — start these two folded
+// so the feed reads as "what's active" rather than a wall of finished shows.
+const DEFAULT_COLLAPSED: WatchStatus[] = ['completed', 'stopped']
 
 export function WatchlistPage() {
   const { shows, saveShow, loading } = useData()
-  const [filter, setFilter] = useState<WatchStatus | 'all'>('all')
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<WatchStatus>>(new Set(DEFAULT_COLLAPSED))
 
-  const filtered = useMemo(() => {
-    return shows
-      .filter((s) => filter === 'all' || s.status === filter)
-      .filter((s) => s.title.toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => a.title.localeCompare(b.title))
-  }, [shows, filter, search])
+  const sections = useMemo(() => {
+    const query = search.toLowerCase()
+    return SECTION_ORDER.map((status) => ({
+      status,
+      shows: shows
+        .filter((s) => s.status === status)
+        .filter((s) => s.title.toLowerCase().includes(query))
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    }))
+  }, [shows, search])
+
+  function toggleSection(status: WatchStatus) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(status)) next.delete(status)
+      else next.add(status)
+      return next
+    })
+  }
 
   async function handlePick(media: AniListMedia) {
     const now = new Date().toISOString()
@@ -40,6 +58,7 @@ export function WatchlistPage() {
       anilistId: media.id,
       title: bestTitle(media),
       coverUrl: media.coverImage.large,
+      bannerUrl: media.bannerImage,
       customCoverUrl: null,
       format: media.format,
       totalEpisodes: media.episodes,
@@ -57,6 +76,8 @@ export function WatchlistPage() {
     await saveShow(show)
     setModalOpen(false)
   }
+
+  const totalMatching = sections.reduce((sum, s) => sum + s.shows.length, 0)
 
   return (
     <div>
@@ -76,41 +97,42 @@ export function WatchlistPage() {
         </button>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-3">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => setFilter(f.value)}
-            className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              filter === f.value
-                ? 'border-accent bg-accent-muted text-text'
-                : 'border-border text-text-faint hover:text-text-muted'
-            }`}
-          >
-            {f.label}
-            {f.value !== 'all' && (
-              <span className="ml-1 text-text-faint">
-                {shows.filter((s) => s.status === f.value).length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
       {loading ? (
         <p className="py-8 text-center text-sm text-text-faint">Loading your watchlist…</p>
-      ) : filtered.length === 0 ? (
+      ) : shows.length === 0 ? (
         <p className="py-8 text-center text-sm text-text-faint">
-          {shows.length === 0
-            ? 'Nothing here yet — add a show, or import your TV Time data from the Data tab.'
-            : 'No shows match this filter.'}
+          Nothing here yet — add a show, or import your TV Time data from the Data tab.
         </p>
+      ) : totalMatching === 0 ? (
+        <p className="py-8 text-center text-sm text-text-faint">No shows match "{search}".</p>
       ) : (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-          {filtered.map((show) => (
-            <ShowCard key={show.id} show={show} />
-          ))}
+        <div className="space-y-4 pb-4">
+          {sections
+            .filter((section) => section.shows.length > 0)
+            .map((section) => (
+              <div key={section.status}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.status)}
+                  className="mb-2 flex w-full items-center justify-between text-sm font-semibold text-text"
+                >
+                  <span>
+                    {SECTION_LABELS[section.status]}{' '}
+                    <span className="font-normal text-text-faint">({section.shows.length})</span>
+                  </span>
+                  <span aria-hidden className="text-text-faint">
+                    {collapsed.has(section.status) ? '▼' : '▲'}
+                  </span>
+                </button>
+                {!collapsed.has(section.status) && (
+                  <div className="space-y-2">
+                    {section.shows.map((show) => (
+                      <ShowRow key={show.id} show={show} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
         </div>
       )}
 
