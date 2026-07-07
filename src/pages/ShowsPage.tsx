@@ -17,7 +17,7 @@ const SECTION_LABELS = Object.fromEntries(WATCH_STATUSES.map((s) => [s.value, s.
 // so the feed reads as "what's active" rather than a wall of finished shows.
 const DEFAULT_COLLAPSED: WatchStatus[] = ['completed', 'stopped']
 
-export function WatchlistPage() {
+export function ShowsPage() {
   const { shows, saveShow, loading } = useData()
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -70,6 +70,7 @@ export function WatchlistPage() {
       needsReview: false,
       reviewNote: null,
       notes: null,
+      skipMarkThroughPrompt: false,
       createdAt: now,
       updatedAt: now,
     }

@@ -41,6 +41,9 @@ export interface Show {
   needsReview: boolean
   reviewNote: string | null
   notes: string | null
+  /** "Never" from the mark-through prompt — stops asking to backfill earlier
+   * unwatched episodes for shows where that's deliberate (e.g. skipped filler). */
+  skipMarkThroughPrompt: boolean
   createdAt: string
   updatedAt: string
 }

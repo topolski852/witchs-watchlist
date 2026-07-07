@@ -4,6 +4,7 @@ import { useData } from '../store/useData'
 import { CoverImage } from '../components/CoverImage'
 import { StatusBadge } from '../components/StatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { MarkThroughDialog } from '../components/MarkThroughDialog'
 import { AboutSection } from '../components/AboutSection'
 import { EpisodeList } from '../components/EpisodeList'
 import { WATCH_STATUSES, type Episode, type WatchStatus } from '../types/schema'
@@ -18,6 +19,7 @@ export function ShowDetailPage() {
 
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [customCoverDraft, setCustomCoverDraft] = useState(show?.customCoverUrl ?? '')
+  const [pendingMarkThrough, setPendingMarkThrough] = useState<number | null>(null)
 
   const time = useMemo(() => (show ? showWatchTime(show) : null), [show])
 
@@ -48,11 +50,31 @@ export function ShowDetailPage() {
     applyEpisodes(show.episodes.map((e) => (e.number === number ? { ...e, ...patch } : e)))
   }
 
+  // extraPatch lets "Never" set skipMarkThroughPrompt in the same update as
+  // the episode change — two separate update() calls back to back would both
+  // close over the same stale `show`, so the second would clobber the first.
+  function markWatchedSingle(number: number, extraPatch: Partial<typeof show> = {}) {
+    if (!show) return
+    const episodes = show.episodes.map((e) =>
+      e.number === number ? { ...e, watched: true, watchedAt: new Date().toISOString() } : e,
+    )
+    const status = deriveWatchStatus(episodes, show.hasSequel, show.status)
+    update({ episodes, status, ...extraPatch })
+  }
+
   function toggleWatched(ep: Episode) {
-    updateEpisode(ep.number, {
-      watched: !ep.watched,
-      watchedAt: !ep.watched ? new Date().toISOString() : ep.watchedAt,
-    })
+    if (!show) return
+    if (ep.watched) {
+      // un-watching never prompts — only forward progress does
+      updateEpisode(ep.number, { watched: false })
+      return
+    }
+    const hasEarlierGap = show.episodes.some((e) => e.number < ep.number && !e.watched)
+    if (hasEarlierGap && !show.skipMarkThroughPrompt) {
+      setPendingMarkThrough(ep.number)
+      return
+    }
+    markWatchedSingle(ep.number)
   }
 
   function markThrough(number: number) {
@@ -260,6 +282,25 @@ export function ShowDetailPage() {
         onConfirm={async () => {
           await removeShow(show.id)
           navigate('/')
+        }}
+      />
+
+      <MarkThroughDialog
+        open={pendingMarkThrough !== null}
+        episodeNumber={pendingMarkThrough ?? 0}
+        onYes={() => {
+          if (pendingMarkThrough !== null) markThrough(pendingMarkThrough)
+          setPendingMarkThrough(null)
+        }}
+        onNo={() => {
+          if (pendingMarkThrough !== null) markWatchedSingle(pendingMarkThrough)
+          setPendingMarkThrough(null)
+        }}
+        onNever={() => {
+          if (pendingMarkThrough !== null) {
+            markWatchedSingle(pendingMarkThrough, { skipMarkThroughPrompt: true })
+          }
+          setPendingMarkThrough(null)
         }}
       />
     </div>

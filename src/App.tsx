@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { NavBar } from './components/NavBar'
-import { WatchlistPage } from './pages/WatchlistPage'
+import { HomePage } from './pages/HomePage'
+import { ShowsPage } from './pages/ShowsPage'
 import { ShowDetailPage } from './pages/ShowDetailPage'
 import { ListsPage } from './pages/ListsPage'
 import { StatsPage } from './pages/StatsPage'
@@ -21,7 +22,8 @@ function App() {
         </header>
         <main className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <Routes>
-            <Route path="/" element={<WatchlistPage />} />
+            <Route path="/" element={<HomePage />} />
+            <Route path="/shows" element={<ShowsPage />} />
             <Route path="/show/:id" element={<ShowDetailPage />} />
             <Route path="/lists" element={<ListsPage />} />
             <Route path="/stats" element={<StatsPage />} />

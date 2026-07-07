@@ -118,6 +118,7 @@ export async function buildImportPlan(
       needsReview: !matched || rewatchEpisodes.length > 0,
       reviewNote: notes.length > 0 ? notes.join(' ') : null,
       notes: null,
+      skipMarkThroughPrompt: false,
       createdAt: now,
       updatedAt: now,
     })

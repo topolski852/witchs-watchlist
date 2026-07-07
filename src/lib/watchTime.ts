@@ -35,6 +35,20 @@ export function totalWatchTime(shows: Show[]): WatchTimeMinutes {
   )
 }
 
+/**
+ * Breaks total minutes into months/days/hours for the home page's "Total
+ * Time" overview card — a fixed 30-day/24-hour approximation, not a
+ * calendar-accurate breakdown.
+ */
+export function formatDurationParts(minutes: number): { months: number; days: number; hours: number } {
+  const totalHours = Math.floor(minutes / 60)
+  const totalDays = Math.floor(totalHours / 24)
+  const months = Math.floor(totalDays / 30)
+  const days = totalDays % 30
+  const hours = totalHours % 24
+  return { months, days, hours }
+}
+
 export function formatMinutes(minutes: number): string {
   const totalHours = Math.floor(minutes / 60)
   const days = Math.floor(totalHours / 24)
