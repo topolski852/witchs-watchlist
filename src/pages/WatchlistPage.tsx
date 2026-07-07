@@ -44,6 +44,7 @@ export function WatchlistPage() {
       format: media.format,
       totalEpisodes: media.episodes,
       episodeDurationMin: media.duration,
+      airingStatus: media.status,
       status: 'plan_to_watch',
       rewatchCount: 0,
       episodes,

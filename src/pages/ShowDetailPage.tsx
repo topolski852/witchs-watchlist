@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { WATCH_STATUSES, type Episode, type WatchStatus } from '../types/schema'
 import { showWatchTime, formatMinutes } from '../lib/watchTime'
+import { deriveWatchStatus } from '../lib/statusRules'
 
 export function ShowDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -32,10 +33,18 @@ export function ShowDetailPage() {
     saveShow({ ...show, ...patch, updatedAt: new Date().toISOString() })
   }
 
+  // Every episode edit routes through here so watch status stays derived from
+  // actual progress: none watched → Plan to Watch, all watched → Completed/Caught
+  // Up, otherwise Watching. "Stopped" is manual-only and never auto-overridden.
+  function applyEpisodes(episodes: Episode[]) {
+    if (!show) return
+    const status = deriveWatchStatus(episodes, show.totalEpisodes, show.airingStatus, show.status)
+    update({ episodes, status })
+  }
+
   function updateEpisode(number: number, patch: Partial<Episode>) {
     if (!show) return
-    const episodes = show.episodes.map((e) => (e.number === number ? { ...e, ...patch } : e))
-    update({ episodes })
+    applyEpisodes(show.episodes.map((e) => (e.number === number ? { ...e, ...patch } : e)))
   }
 
   function toggleWatched(ep: Episode) {
@@ -47,12 +56,13 @@ export function ShowDetailPage() {
 
   function markThrough(number: number) {
     if (!show) return
-    const episodes = show.episodes.map((e) =>
-      e.number <= number && !e.watched
-        ? { ...e, watched: true, watchedAt: new Date().toISOString() }
-        : e,
+    applyEpisodes(
+      show.episodes.map((e) =>
+        e.number <= number && !e.watched
+          ? { ...e, watched: true, watchedAt: new Date().toISOString() }
+          : e,
+      ),
     )
-    update({ episodes })
   }
 
   function bumpEpisodeRewatch(ep: Episode, delta: number) {

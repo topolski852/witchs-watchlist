@@ -31,6 +31,9 @@ export interface Show {
   format: string | null
   totalEpisodes: number | null
   episodeDurationMin: number | null
+  /** AniList's airing status (e.g. RELEASING, FINISHED) — used to decide whether
+   * finishing all known episodes means "Completed" or just "Caught Up". */
+  airingStatus: string | null
   status: WatchStatus
   rewatchCount: number
   episodes: Episode[]

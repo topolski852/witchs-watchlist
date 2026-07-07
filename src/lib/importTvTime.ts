@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid'
-import type { CustomList, Episode, ListEntry, Show, WatchStatus } from '../types/schema'
+import type { CustomList, Episode, ListEntry, Show } from '../types/schema'
 import { bestTitle, pickBestMatch, searchAniList, type AniListMedia } from './anilist'
+import { deriveWatchStatus } from './statusRules'
 import type { ParsedTvTimeData, RawFavoriteRef } from './tvtimeParse'
 
 export interface ImportProgress {
@@ -31,18 +32,6 @@ function buildEpisodes(totalEpisodes: number | null, episodesSeen: number): Epis
     })
   }
   return episodes
-}
-
-function deriveStatus(
-  archived: boolean,
-  matched: AniListMedia | null,
-  episodesSeen: number,
-): WatchStatus {
-  if (archived) return 'stopped'
-  if (!matched) return 'watching'
-  if (matched.episodes != null && episodesSeen >= matched.episodes) return 'completed'
-  if (matched.status === 'RELEASING') return 'caught_up'
-  return 'watching'
 }
 
 async function matchOne(title: string): Promise<AniListMedia | null> {
@@ -109,6 +98,10 @@ export async function buildImportPlan(
       notes.push('AniList has no episode count for this title yet — episode list left empty.')
     }
 
+    const totalEpisodes = matched?.episodes ?? null
+    const airingStatus = matched?.status ?? null
+    const status = deriveWatchStatus(episodes, totalEpisodes, airingStatus, raw.archived ? 'stopped' : 'watching')
+
     shows.push({
       id: uuid(),
       anilistId: matched?.id ?? null,
@@ -116,9 +109,10 @@ export async function buildImportPlan(
       coverUrl: matched?.coverImage.large ?? null,
       customCoverUrl: null,
       format: matched?.format ?? null,
-      totalEpisodes: matched?.episodes ?? null,
+      totalEpisodes,
       episodeDurationMin: matched?.duration ?? null,
-      status: deriveStatus(raw.archived, matched, raw.episodesSeen),
+      airingStatus,
+      status,
       rewatchCount: showRewatchCount,
       episodes,
       needsReview: !matched || rewatchEpisodes.length > 0,
