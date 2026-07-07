@@ -4,6 +4,7 @@ import { useData } from '../store/useData'
 import { CoverImage } from '../components/CoverImage'
 import { StatusBadge } from '../components/StatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { AboutSection } from '../components/AboutSection'
 import { WATCH_STATUSES, type Episode, type WatchStatus } from '../types/schema'
 import { showWatchTime, formatMinutes } from '../lib/watchTime'
 import { deriveWatchStatus } from '../lib/statusRules'
@@ -109,6 +110,8 @@ export function ShowDetailPage() {
           )}
         </div>
       </div>
+
+      <AboutSection anilistId={show.anilistId} hasSequel={show.hasSequel} />
 
       {show.needsReview && (
         <div className="mt-4 rounded-lg border border-status-stopped/50 bg-status-stopped/10 p-3 text-sm text-text">

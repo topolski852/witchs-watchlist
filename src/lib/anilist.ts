@@ -45,6 +45,33 @@ query ($id: Int) {
   }
 }`
 
+export interface AniListDetails {
+  description: string | null
+  genres: string[]
+  averageScore: number | null
+  season: string | null
+  seasonYear: number | null
+  source: string | null
+  studios: string[]
+  startDate: { year: number | null; month: number | null; day: number | null } | null
+  endDate: { year: number | null; month: number | null; day: number | null } | null
+}
+
+const DETAILS_QUERY = `
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    description(asHtml: false)
+    genres
+    averageScore
+    season
+    seasonYear
+    source
+    studios(isMain: true) { nodes { name } }
+    startDate { year month day }
+    endDate { year month day }
+  }
+}`
+
 // AniList's public API is rate-limited, and has been running in a "degraded"
 // mode (unofficially ~30 req/min) for a long time. Getting rate-limited hard
 // enough trips Cloudflare in front of it, which then blocks *every* request
@@ -119,6 +146,32 @@ export function getAniListById(id: number): Promise<AniListMedia | null> {
   return enqueue(async () => {
     const data = await graphql<{ Media: AniListMedia | null }>(BY_ID_QUERY, { id })
     return data.Media
+  })
+}
+
+interface RawDetails {
+  description: string | null
+  genres: string[]
+  averageScore: number | null
+  season: string | null
+  seasonYear: number | null
+  source: string | null
+  studios: { nodes: { name: string }[] }
+  startDate: AniListDetails['startDate']
+  endDate: AniListDetails['endDate']
+}
+
+/**
+ * Fetched lazily (only when a show's About panel is opened) rather than
+ * stored on every Show record — descriptions/tags are the heaviest fields
+ * AniList returns, and most of the 482 shows in a library will never have
+ * this panel opened, so keeping it out of the main schema keeps storage tiny.
+ */
+export function getAniListDetails(id: number): Promise<AniListDetails | null> {
+  return enqueue(async () => {
+    const data = await graphql<{ Media: RawDetails | null }>(DETAILS_QUERY, { id })
+    if (!data.Media) return null
+    return { ...data.Media, studios: data.Media.studios.nodes.map((n) => n.name) }
   })
 }
 
