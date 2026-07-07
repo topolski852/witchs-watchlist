@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react'
-import { v4 as uuid } from 'uuid'
+import { Link } from 'react-router-dom'
 import { useData } from '../store/useData'
 import { ShowRow } from '../components/ShowRow'
-import { SearchAniListModal } from '../components/SearchAniListModal'
-import { WATCH_STATUSES, type Episode, type Show, type WatchStatus } from '../types/schema'
-import type { AniListMedia } from '../lib/anilist'
-import { bestTitle, hasSequelRelation } from '../lib/anilist'
+import { WATCH_STATUSES, type WatchStatus } from '../types/schema'
 import { ChevronIcon } from '../components/icons'
 
 // Home-feed order: active shows first, "done with it" statuses last.
@@ -19,9 +16,8 @@ const SECTION_LABELS = Object.fromEntries(WATCH_STATUSES.map((s) => [s.value, s.
 const DEFAULT_COLLAPSED: WatchStatus[] = ['completed', 'stopped']
 
 export function ShowsPage() {
-  const { shows, saveShow, loading } = useData()
+  const { shows, loading } = useData()
   const [search, setSearch] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<WatchStatus>>(new Set(DEFAULT_COLLAPSED))
 
   const sections = useMemo(() => {
@@ -44,39 +40,6 @@ export function ShowsPage() {
     })
   }
 
-  async function handlePick(media: AniListMedia) {
-    const now = new Date().toISOString()
-    const episodes: Episode[] = Array.from({ length: media.episodes ?? 0 }, (_, i) => ({
-      number: i + 1,
-      seasonNumber: null,
-      watchCount: 0,
-      watchDates: [],
-    }))
-    const show: Show = {
-      id: uuid(),
-      anilistId: media.id,
-      title: bestTitle(media),
-      coverUrl: media.coverImage.large,
-      bannerUrl: media.bannerImage,
-      customCoverUrl: null,
-      format: media.format,
-      totalEpisodes: media.episodes,
-      episodeDurationMin: media.duration,
-      hasSequel: hasSequelRelation(media),
-      status: 'plan_to_watch',
-      watchCount: 0,
-      episodes,
-      needsReview: false,
-      reviewNote: null,
-      notes: null,
-      skipMarkThroughPrompt: false,
-      createdAt: now,
-      updatedAt: now,
-    }
-    await saveShow(show)
-    setModalOpen(false)
-  }
-
   const totalMatching = sections.reduce((sum, s) => sum + s.shows.length, 0)
 
   return (
@@ -88,13 +51,12 @@ export function ShowsPage() {
           placeholder="Filter your list…"
           className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
         />
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
+        <Link
+          to="/search"
           className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-hover"
         >
           + Add
-        </button>
+        </Link>
       </div>
 
       {loading ? (
@@ -136,8 +98,6 @@ export function ShowsPage() {
             ))}
         </div>
       )}
-
-      <SearchAniListModal open={modalOpen} onClose={() => setModalOpen(false)} onPick={handlePick} />
     </div>
   )
 }

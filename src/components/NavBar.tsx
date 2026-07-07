@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { CauldronIcon, FoxIcon, HourglassIcon, SparkleIcon } from './icons'
+import { CauldronIcon, CrystalBallIcon, FoxIcon, HourglassIcon, SparkleIcon } from './icons'
 
 const links = [
   { to: '/', label: 'Home', Icon: FoxIcon },
+  { to: '/search', label: 'Search', Icon: CrystalBallIcon },
   { to: '/lists', label: 'Lists', Icon: SparkleIcon },
   { to: '/stats', label: 'Stats', Icon: HourglassIcon },
   { to: '/data', label: 'Data', Icon: CauldronIcon },

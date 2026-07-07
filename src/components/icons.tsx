@@ -78,6 +78,22 @@ export function WitchHatMoonIcon(props: IconProps) {
   )
 }
 
+/** Search nav icon — a scrying crystal ball. */
+export function CrystalBallIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="10" r="7.2" />
+      <path d="M7.5 19 h9" />
+      <path d="M9.2 16.8 L8.3 19 M14.8 16.8 L15.7 19" />
+      <path
+        d="M12 6.5 L12.9 9.1 L15.5 10 L12.9 10.9 L12 13.5 L11.1 10.9 L8.5 10 L11.1 9.1 Z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  )
+}
+
 export function CloseIcon(props: IconProps) {
   return (
     <svg {...base} strokeWidth={1.8} {...props}>

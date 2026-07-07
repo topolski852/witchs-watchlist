@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 import { NavBar } from './components/NavBar'
 import { HomePage } from './pages/HomePage'
 import { ShowsPage } from './pages/ShowsPage'
+import { SearchPage } from './pages/SearchPage'
 import { ShowDetailPage } from './pages/ShowDetailPage'
 import { ListsPage } from './pages/ListsPage'
 import { StatsPage } from './pages/StatsPage'
@@ -23,6 +24,7 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/shows" element={<ShowsPage />} />
+            <Route path="/search" element={<SearchPage />} />
             <Route path="/show/:id" element={<ShowDetailPage />} />
             <Route path="/lists" element={<ListsPage />} />
             <Route path="/stats" element={<StatsPage />} />
