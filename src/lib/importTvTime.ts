@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid'
-import type { CustomList, Episode, ListEntry, Show } from '../types/schema'
-import { bestTitle, hasSequelRelation, pickBestMatch, searchAniList, type AniListMedia } from './anilist'
+import type { CustomList, Episode, ListEntry, SeasonMeta, Show } from '../types/schema'
+import { bestTitle, buildSeasonChain, hasSequelRelation, pickBestMatch, searchAniList, type AniListMedia } from './anilist'
 import { deriveWatchStatus } from './statusRules'
 import type { ParsedTvTimeData, RawFavoriteRef } from './tvtimeParse'
 
@@ -18,27 +18,23 @@ export interface ImportPlan {
   unmatchedCount: number
 }
 
-/**
- * AniList splits long-running/seasonal anime into multiple separate media
- * entries (e.g. "My Hero Academia" Season 1 is its own entry with 13
- * episodes, entirely separate from Season 2+), while TV Time counted
- * episodes continuously across every season under one followed show. If the
- * matched AniList entry's episode count is smaller than what TV Time
- * recorded as seen, using it as the cap would silently truncate the episode
- * list and throw away real watch history/time — so the *larger* of the two
- * numbers always wins here. The show still only links to one AniList entry
- * (this data model doesn't support multi-season splits), so the extra
- * episodes beyond the matched entry's own count are unlabeled placeholders;
- * `needsReview` flags this in buildImportPlan so it's visible, not silent.
- */
-function buildEpisodes(totalEpisodes: number | null, episodesSeen: number): Episode[] {
-  const count = Math.max(totalEpisodes ?? 0, episodesSeen)
+interface BuiltEpisodes {
+  episodes: Episode[]
+  seasons: SeasonMeta[] | null
+  /** How many episodes AniList's season chain actually accounts for — used
+   * to detect when TV Time recorded more than every known season combined. */
+  knownTotal: number
+}
+
+/** Flat single-"season" fallback for shows with no AniList match at all —
+ * there's no season structure to build without AniList's data behind it. */
+function buildFlatEpisodes(episodesSeen: number): BuiltEpisodes {
   const episodes: Episode[] = []
-  for (let n = 1; n <= count; n++) {
+  for (let n = 1; n <= episodesSeen; n++) {
     episodes.push({
       number: n,
       seasonNumber: null,
-      watchCount: n <= episodesSeen ? 1 : 0,
+      watchCount: 1,
       watchDates: [],
       durationMin: null,
       title: null,
@@ -46,7 +42,69 @@ function buildEpisodes(totalEpisodes: number | null, episodesSeen: number): Epis
       artUrl: null,
     })
   }
-  return episodes
+  return { episodes, seasons: null, knownTotal: episodes.length }
+}
+
+/**
+ * Builds one show's full episode/season list from its AniList season chain
+ * (see buildSeasonChain in lib/anilist.ts) — TV Time's continuous
+ * `episodesSeen` count is distributed across the chain in watch order (season
+ * 1 fills first, then season 2, etc.), so a show that's actually 8 AniList
+ * seasons gets one correctly-ordered episode list instead of being capped at
+ * whichever single season search happened to match. If episodesSeen exceeds
+ * every known season combined, the remainder is appended as unlabeled
+ * episodes onto the last season — surfaced via a review note, never
+ * silently dropped or silently fabricated as fake season data.
+ */
+function buildEpisodesFromChain(chain: AniListMedia[], episodesSeen: number): BuiltEpisodes {
+  const episodes: Episode[] = []
+  const seasons: SeasonMeta[] = []
+  let remaining = episodesSeen
+  let globalNumber = 0
+
+  chain.forEach((media, idx) => {
+    const seasonNumber = idx + 1
+    const isLast = idx === chain.length - 1
+    // An unknown episode count (e.g. a still-airing final season) absorbs
+    // whatever's left rather than being treated as a 0-episode season.
+    const count = media.episodes ?? (isLast ? remaining : 0)
+    seasons.push({ number: seasonNumber, name: bestTitle(media), bannerUrl: media.bannerImage, anilistId: media.id })
+    for (let n = 1; n <= count; n++) {
+      globalNumber++
+      const watched = remaining > 0
+      episodes.push({
+        number: globalNumber,
+        seasonNumber,
+        watchCount: watched ? 1 : 0,
+        watchDates: [],
+        durationMin: media.duration,
+        title: null,
+        description: null,
+        artUrl: null,
+      })
+      if (watched) remaining--
+    }
+  })
+
+  const knownTotal = globalNumber
+  if (remaining > 0) {
+    const lastSeason = seasons[seasons.length - 1]?.number ?? 1
+    for (let i = 0; i < remaining; i++) {
+      globalNumber++
+      episodes.push({
+        number: globalNumber,
+        seasonNumber: lastSeason,
+        watchCount: 1,
+        watchDates: [],
+        durationMin: null,
+        title: null,
+        description: null,
+        artUrl: null,
+      })
+    }
+  }
+
+  return { episodes, seasons, knownTotal }
 }
 
 async function matchOne(title: string): Promise<AniListMedia | null> {
@@ -97,6 +155,18 @@ export async function buildImportPlan(
   // AniList search results, keyed by normalized title, so favorite-list entries
   // that reference a show we already imported don't trigger a second lookup.
   const matchCache = new Map<string, AniListMedia | null>()
+  // Season chains, keyed by *every* media id that appears in them, so a
+  // favorite-list entry matching a different season of a show already in the
+  // main list still resolves to the same chain/root instead of re-walking it
+  // (or worse, treating it as a different show).
+  const chainCache = new Map<number, AniListMedia[]>()
+  async function resolveChain(media: AniListMedia): Promise<AniListMedia[]> {
+    const cached = chainCache.get(media.id)
+    if (cached) return cached
+    const chain = await buildSeasonChain(media)
+    for (const m of chain) chainCache.set(m.id, chain)
+    return chain
+  }
 
   for (let i = 0; i < data.shows.length; i++) {
     const raw = data.shows[i]
@@ -105,14 +175,22 @@ export async function buildImportPlan(
     const matched = await matchOne(raw.name)
     matchCache.set(raw.name, matched)
 
+    const chain = matched ? await resolveChain(matched) : null
+    const root = chain?.[0] ?? null
+    const chainEnd = chain ? chain[chain.length - 1] : null
+    const built = chain ? buildEpisodesFromChain(chain, raw.episodesSeen) : buildFlatEpisodes(raw.episodesSeen)
+    const { episodes, seasons, knownTotal } = built
+
     const rewatchEpisodes = data.rewatchByShowName.get(raw.name) ?? []
-    const episodes = buildEpisodes(matched?.episodes ?? null, raw.episodesSeen)
     let showWatchCount = 0
     for (const rw of rewatchEpisodes) {
-      const ep = episodes.find((e) => e.number === rw.episodeNumber)
+      // TV Time numbers episodes per-season (episode_number resets each
+      // season), not continuously — so a chain-built show has to match on
+      // (season, in-season position), not the show's global sequential number.
+      const ep = seasons
+        ? episodes.filter((e) => e.seasonNumber === rw.seasonNumber)[rw.episodeNumber - 1]
+        : episodes.find((e) => e.number === rw.episodeNumber)
       if (ep) {
-        // rw.count is TV Time's rewatch tally (repeat views beyond the first) —
-        // the running count is that plus the first watch itself.
         ep.watchCount = Math.max(1, ep.watchCount) + rw.count
         ep.watchDates = [rw.updatedAt]
         showWatchCount = Math.max(showWatchCount, rw.count)
@@ -135,37 +213,40 @@ export async function buildImportPlan(
     if (matched && episodes.length === 0) {
       notes.push('AniList has no episode count for this title yet — episode list left empty.')
     }
-    // The AniList season-split case buildEpisodes compensates for — flag it
-    // so it's visible rather than a silently-inflated episode count.
-    const seasonSplit = matched?.episodes != null && matched.episodes < raw.episodesSeen
+    if (chain && chain.length > 1) {
+      notes.push(
+        `Matched across ${chain.length} AniList seasons (${chain.map((m) => bestTitle(m)).join(' → ')}) — double-check the season breakdown looks right.`,
+      )
+    }
+    const seasonSplit = matched != null && knownTotal < raw.episodesSeen
     if (seasonSplit) {
       notes.push(
-        `TV Time recorded ${raw.episodesSeen} episodes seen, but the matched AniList entry only lists ${matched!.episodes} — it likely only covers one season of this show. Episode count was kept at ${raw.episodesSeen} to preserve your watch history; verify the episode list and consider re-linking to a different AniList entry if one covers the full series.`,
+        `TV Time recorded ${raw.episodesSeen} episodes seen, but AniList only accounts for ${knownTotal} across ${chain?.length ?? 1} known season(s) — the extra ${raw.episodesSeen - knownTotal} were kept as unlabeled episodes on the last season so your watch history isn't lost. This can happen when TV Time's count includes rewatches, or a season AniList doesn't have linked yet.`,
       )
     }
 
-    const hasSequel = matched ? hasSequelRelation(matched) : false
+    const hasSequel = chainEnd ? hasSequelRelation(chainEnd) : false
     const status = deriveWatchStatus(episodes, hasSequel, raw.archived ? 'stopped' : 'watching')
 
-    const title = matched ? bestTitle(matched) : raw.name
-    const existing = matched ? existingByAnilistId.get(matched.id) : undefined
+    const title = root ? bestTitle(root) : raw.name
+    const existing = root ? existingByAnilistId.get(root.id) : undefined
 
     shows.push({
       id: existing?.id ?? uuid(),
-      anilistId: matched?.id ?? null,
+      anilistId: root?.id ?? null,
       title,
-      coverUrl: matched?.coverImage.large ?? null,
-      bannerUrl: matched?.bannerImage ?? null,
+      coverUrl: root?.coverImage.large ?? null,
+      bannerUrl: root?.bannerImage ?? null,
       customCoverUrl: existing?.customCoverUrl ?? null,
-      format: matched?.format ?? null,
+      format: root?.format ?? null,
       totalEpisodes: episodes.length,
-      episodeDurationMin: matched?.duration ?? null,
+      episodeDurationMin: root?.duration ?? null,
       hasSequel,
       status,
       watchCount: showWatchCount,
       episodes,
-      seasons: existing?.seasons ?? null,
-      needsReview: !matched || rewatchEpisodes.length > 0 || seasonSplit,
+      seasons,
+      needsReview: !matched || rewatchEpisodes.length > 0 || seasonSplit || (chain?.length ?? 0) > 1,
       reviewNote: notes.length > 0 ? notes.join(' ') : null,
       notes: existing?.notes ?? null,
       skipMarkThroughPrompt: existing?.skipMarkThroughPrompt ?? false,
@@ -215,7 +296,11 @@ export async function buildImportPlan(
         matchCache.set(name, matched)
       }
 
-      const linkedByAnilistId = matched ? showByAnilistId.get(matched.id) : undefined
+      // Resolve to the same chain root the main show list would have used,
+      // so a favorite matching e.g. a final-season entry still links to the
+      // show that's keyed by its season-1 AniList id.
+      const root = matched ? (await resolveChain(matched))[0] : null
+      const linkedByAnilistId = root ? showByAnilistId.get(root.id) : undefined
       if (linkedByAnilistId) {
         entries.push({
           id: uuid(),
@@ -231,10 +316,10 @@ export async function buildImportPlan(
 
       entries.push({
         id: uuid(),
-        title: matched ? bestTitle(matched) : name,
-        coverUrl: matched?.coverImage.large ?? null,
-        anilistId: matched?.id ?? null,
-        type: matched ? type : 'other',
+        title: root ? bestTitle(root) : name,
+        coverUrl: root?.coverImage.large ?? null,
+        anilistId: root?.id ?? null,
+        type: root ? type : 'other',
         linkedShowId: null,
         createdAt: now,
       })

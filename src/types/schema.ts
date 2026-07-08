@@ -36,6 +36,11 @@ export interface SeasonMeta {
   number: number
   name: string | null
   bannerUrl: string | null
+  /** Set when this season came from a specific entry in an AniList "season
+   * chain" (e.g. My Hero Academia Season 2) — lets episode lookups (titles,
+   * thumbnails) use that season's own AniList data instead of the show's
+   * top-level anilistId. Null for custom shows and single-entry AniList shows. */
+  anilistId: number | null
 }
 
 export interface Show {

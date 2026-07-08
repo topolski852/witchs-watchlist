@@ -224,21 +224,53 @@ export function EpisodeList({
   onSetEpisodeMeta: (number: number, patch: EpisodeMetaPatch) => void
 }) {
   const [view, setView] = useState<ViewMode>('list')
-  const [streaming, setStreaming] = useState<StreamingEpisode[] | null>(null)
+  const [streamingBySeason, setStreamingBySeason] = useState<Map<number | null, StreamingEpisode[]>>(new Map())
   const [selected, setSelected] = useState<number | null>(null)
   const [editingNumber, setEditingNumber] = useState<number | null>(null)
 
+  const seasonMetaByNumber = new Map((seasons ?? []).map((s) => [s.number, s]))
+  // A show chained together from multiple AniList seasons (e.g. My Hero
+  // Academia S1-S8) needs each season's *own* streaming episode list — S2's
+  // episode 1 titles/thumbnails live under S2's AniList id, not S1's. Keyed
+  // by strings (not the episodes/seasons objects themselves) so bumping a
+  // watch count elsewhere doesn't re-trigger a refetch — only an actual
+  // change in which seasons/AniList ids exist does.
+  // `Array.join` turns `null` into an empty string, indistinguishable from
+  // other entries — map it to the literal string 'null' first so splitting
+  // back out is unambiguous.
+  const seasonNumbersKey = Array.from(new Set(episodes.map((e) => (e.seasonNumber == null ? 'null' : String(e.seasonNumber))))).join(
+    ',',
+  )
+  const seasonAnilistKey = (seasons ?? []).map((s) => `${s.number}:${s.anilistId ?? ''}`).join(',')
+
   useEffect(() => {
-    if (!anilistId) return
-    getStreamingEpisodes(anilistId)
-      .then(setStreaming)
-      .catch(() => setStreaming([]))
-  }, [anilistId])
+    let cancelled = false
+    const seasonNumbers = seasonNumbersKey === '' ? [] : seasonNumbersKey.split(',').map((s) => (s === 'null' ? null : Number(s)))
+    const jobs: { season: number | null; id: number }[] = []
+    for (const sn of seasonNumbers) {
+      const id = sn != null ? (seasonMetaByNumber.get(sn)?.anilistId ?? null) : anilistId
+      if (id != null) jobs.push({ season: sn, id })
+    }
+    if (jobs.length === 0) {
+      setStreamingBySeason(new Map())
+      return
+    }
+    Promise.all(
+      jobs.map(
+        async (j) => [j.season, await getStreamingEpisodes(j.id).catch(() => [])] as [number | null, StreamingEpisode[]],
+      ),
+    ).then((results) => {
+      if (!cancelled) setStreamingBySeason(new Map(results))
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anilistId, seasonNumbersKey, seasonAnilistKey])
 
   const watchedCount = episodes.filter((e) => e.watchCount > 0).length
   const selectedEp = episodes.find((e) => e.number === selected) ?? null
   const seasonGroups = groupBySeasons(episodes)
-  const seasonMetaByNumber = new Map((seasons ?? []).map((s) => [s.number, s]))
 
   return (
     <div className="mt-5">
@@ -278,8 +310,8 @@ export function EpisodeList({
                 onSetSeasonMeta={onSetSeasonMeta}
               />
               <div className="space-y-1.5">
-                {group.episodes.map((ep) => {
-                  const stream = streaming?.[ep.number - 1]
+                {group.episodes.map((ep, epIdx) => {
+                  const stream = streamingBySeason.get(group.season)?.[epIdx]
                   return (
                     <div
                       key={ep.number}

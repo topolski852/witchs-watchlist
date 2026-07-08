@@ -249,8 +249,10 @@ export function DataPage() {
         <h2 className="mb-2 text-sm font-semibold text-text">Import from TV Time</h2>
         <p className="mb-2 text-xs text-text-faint">
           Select your TV Time data export folder (the one with <code>user_tv_show_data.csv</code> etc. in it).
-          AniList rate-limits searches, so matching a full library can take 15–25 minutes — you can leave this tab
-          open in the background. Nothing is saved until you review and confirm.
+          AniList rate-limits searches, so matching a full library can take 15–25 minutes (longer if you follow a lot
+          of long-running, multi-season shows — each extra season is looked up individually to build an accurate
+          episode list) — you can leave this tab open in the background. Nothing is saved until you review and
+          confirm.
         </p>
         {!plan && (
           <div className="flex flex-wrap items-center gap-2">

@@ -10,7 +10,7 @@ export interface AniListMedia {
   episodes: number | null
   duration: number | null
   synonyms: string[]
-  relations: { edges: { relationType: string; node: { id: number; type: string } | null }[] } | null
+  relations: { edges: { relationType: string; node: { id: number; type: string; format: string | null } | null }[] } | null
 }
 
 const MEDIA_FIELDS = `
@@ -26,7 +26,7 @@ const MEDIA_FIELDS = `
   relations {
     edges {
       relationType
-      node { id type }
+      node { id type format }
     }
   }
 `
@@ -226,6 +226,63 @@ export function streamingEpisodeTitle(number: number, streaming: StreamingEpisod
  */
 export function hasSequelRelation(media: AniListMedia): boolean {
   return media.relations?.edges.some((e) => e.relationType === 'SEQUEL' && e.node?.type === 'ANIME') ?? false
+}
+
+// Only follow relation edges into another full "season" of the same story —
+// not movies/OVAs/specials, which AniList occasionally still tags PREQUEL/
+// SEQUEL even though they're side content, not a numbered continuation.
+const CHAIN_FORMATS = new Set(['TV', 'ONA'])
+const MAX_CHAIN_HOPS = 20
+
+function chainEdge(media: AniListMedia, type: 'PREQUEL' | 'SEQUEL') {
+  return media.relations?.edges.find(
+    (e) => e.relationType === type && e.node?.type === 'ANIME' && e.node.format != null && CHAIN_FORMATS.has(e.node.format),
+  )
+}
+
+/**
+ * TV Time (and most trackers) count episodes continuously across a whole
+ * franchise, but AniList gives each season its own separate media entry
+ * (e.g. "My Hero Academia" Season 1 is a distinct 13-episode entry from
+ * Season 2). Starting from *any* entry in the franchise — even if search
+ * matched a middle or final season — this walks AniList's PREQUEL relations
+ * back to the true first season, then SEQUEL relations forward, returning
+ * every season in watch order. `fetchById` is injected so this stays
+ * testable/reusable without hardcoding the rate-limited network call.
+ */
+export async function buildSeasonChain(
+  start: AniListMedia,
+  fetchById: (id: number) => Promise<AniListMedia | null> = getAniListById,
+): Promise<AniListMedia[]> {
+  const visited = new Map<number, AniListMedia>([[start.id, start]])
+  async function fetchNode(id: number): Promise<AniListMedia | null> {
+    const existing = visited.get(id)
+    if (existing) return existing
+    const media = await fetchById(id)
+    if (media) visited.set(id, media)
+    return media
+  }
+
+  let root = start
+  for (let i = 0; i < MAX_CHAIN_HOPS; i++) {
+    const edge = chainEdge(root, 'PREQUEL')
+    if (!edge?.node) break
+    const prev = await fetchNode(edge.node.id)
+    if (!prev || prev.id === root.id) break
+    root = prev
+  }
+
+  const chain: AniListMedia[] = [root]
+  let cur = root
+  for (let i = 0; i < MAX_CHAIN_HOPS; i++) {
+    const edge = chainEdge(cur, 'SEQUEL')
+    if (!edge?.node) break
+    const next = await fetchNode(edge.node.id)
+    if (!next || chain.some((m) => m.id === next.id)) break
+    chain.push(next)
+    cur = next
+  }
+  return chain
 }
 
 export function bestTitle(media: AniListMedia): string {

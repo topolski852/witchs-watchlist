@@ -27,7 +27,7 @@ export function buildCustomShow(input: CustomShowInput): Show {
   const seasons: SeasonMeta[] = []
   let number = 1
   input.seasons.forEach((season, seasonIndex) => {
-    seasons.push({ number: seasonIndex + 1, name: null, bannerUrl: null })
+    seasons.push({ number: seasonIndex + 1, name: null, bannerUrl: null, anilistId: null })
     for (let i = 0; i < season.episodeCount; i++) {
       episodes.push({
         number: number++,
