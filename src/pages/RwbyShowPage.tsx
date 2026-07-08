@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../store/useData'
 import { CoverImage } from '../components/CoverImage'
@@ -18,6 +18,27 @@ const RUBY = '#e0344c'
 const WEISS = '#eef1f5'
 const BLAKE = '#8a5cf5'
 const YANG = '#f2b90c'
+
+// The app's shared components (EpisodeList, StatusBadge, dialogs, buttons,
+// inputs) all style themselves via Tailwind utility classes like `bg-surface`
+// and `border-border`, which resolve to the CSS custom properties defined in
+// index.css's `@theme` block (e.g. `--color-surface`). Overriding those same
+// variable names on this page's own wrapper re-skins every one of those
+// shared components in Ruby's reds for RWBY specifically — via ordinary CSS
+// cascade, not by editing the global theme, so no other page is affected.
+const RWBY_THEME_VARS: CSSProperties = {
+  ['--color-bg' as string]: '#170f14',
+  ['--color-surface' as string]: '#241720',
+  ['--color-surface-raised' as string]: '#2f1e2a',
+  ['--color-border' as string]: '#4a2f3a',
+  ['--color-accent' as string]: RUBY,
+  ['--color-accent-hover' as string]: '#ea5064',
+  ['--color-accent-soft' as string]: '#b8303f',
+  ['--color-accent-muted' as string]: '#4a1e26',
+  ['--color-text' as string]: '#f5eef0',
+  ['--color-text-muted' as string]: '#c9a3ab',
+  ['--color-text-faint' as string]: '#8f6e77',
+}
 
 const BEES = [
   { top: '8%', left: '6%', size: 28, rotate: -18 },
@@ -71,11 +92,24 @@ export function RwbyShowPage() {
   } = actions
 
   return (
-    <div className="pb-6">
+    <div
+      className="-mx-4 min-h-[calc(100vh-8rem)] px-4 pb-6 text-text"
+      style={{
+        ...RWBY_THEME_VARS,
+        backgroundColor: '#170f14',
+        backgroundImage: [
+          `radial-gradient(ellipse 65% 35% at 12% 0%, ${RUBY}1f, transparent)`,
+          `radial-gradient(ellipse 65% 35% at 88% 12%, ${WEISS}0d, transparent)`,
+          `radial-gradient(ellipse 65% 45% at 8% 75%, ${BLAKE}17, transparent)`,
+          `radial-gradient(ellipse 65% 45% at 92% 90%, ${YANG}17, transparent)`,
+        ].join(', '),
+        backgroundAttachment: 'fixed',
+      }}
+    >
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="mb-2 text-sm text-text-faint hover:text-text-muted"
+        className="pt-4 text-sm text-text-faint hover:text-text-muted"
       >
         ← Back
       </button>
@@ -83,9 +117,9 @@ export function RwbyShowPage() {
       {/* Hero: the 4 team colors + symbols, with a few bees scattered around
           for Bumblebee (Blake x Yang, canon as of Volume 9). */}
       <div
-        className="relative -mx-4 overflow-hidden px-4 py-6 sm:rounded-b-2xl"
+        className="relative -mx-4 mt-2 overflow-hidden px-4 py-6 sm:rounded-b-2xl"
         style={{
-          background: `linear-gradient(120deg, ${RUBY}26 0%, ${WEISS}14 33%, ${BLAKE}26 66%, ${YANG}22 100%)`,
+          background: `linear-gradient(120deg, ${RUBY}33 0%, ${WEISS}1a 33%, ${BLAKE}33 66%, ${YANG}2b 100%)`,
         }}
       >
         {BEES.map((b, i) => (
