@@ -224,77 +224,37 @@ export function EpisodeList({
   onSetEpisodeMeta: (number: number, patch: EpisodeMetaPatch) => void
 }) {
   const [view, setView] = useState<ViewMode>('list')
-  const [streamingBySeason, setStreamingBySeason] = useState<Map<number | null, StreamingEpisode[]>>(new Map())
+  const [streaming, setStreaming] = useState<StreamingEpisode[]>([])
   const [selected, setSelected] = useState<number | null>(null)
   const [editingNumber, setEditingNumber] = useState<number | null>(null)
 
   const seasonMetaByNumber = new Map((seasons ?? []).map((s) => [s.number, s]))
 
-  // A show chained together from multiple AniList seasons needs each
-  // season's *own* streaming episode list — S2's episode 1 titles/thumbnails
-  // live under S2's AniList id, not S1's. Keyed by strings (not the
-  // episodes/seasons objects themselves) so bumping a watch count elsewhere
-  // doesn't re-trigger a refetch — only an actual change in which
-  // seasons/AniList ids exist does.
-  // `Array.join` turns `null` into an empty string, indistinguishable from
-  // other entries — map it to the literal string 'null' first so splitting
-  // back out is unambiguous.
-  const seasonNumbersKey = Array.from(new Set(episodes.map((e) => (e.seasonNumber == null ? 'null' : String(e.seasonNumber))))).join(
-    ',',
-  )
-  const seasonAnilistKey = (seasons ?? []).map((s) => `${s.number}:${s.anilistId ?? ''}`).join(',')
-
+  // AniList-backed shows are always single-season now (each AniList season
+  // is its own Show — see importTvTime.ts), so there's only ever one id to
+  // fetch. Custom shows (the only ones with a non-null `seasons`) always
+  // have anilistId: null per season, so they never reach this fetch at all.
   useEffect(() => {
     let cancelled = false
-    const seasonNumbers = seasonNumbersKey === '' ? [] : seasonNumbersKey.split(',').map((s) => (s === 'null' ? null : Number(s)))
-    const jobs: { season: number | null; id: number }[] = []
-    for (const sn of seasonNumbers) {
-      const id = sn != null ? (seasonMetaByNumber.get(sn)?.anilistId ?? null) : anilistId
-      if (id != null) jobs.push({ season: sn, id })
-    }
-    if (jobs.length === 0) {
-      setStreamingBySeason(new Map())
+    if (anilistId == null) {
+      setStreaming([])
       return
     }
-    Promise.all(
-      jobs.map(
-        async (j) => [j.season, await getStreamingEpisodes(j.id).catch(() => [])] as [number | null, StreamingEpisode[]],
-      ),
-    ).then((results) => {
-      if (cancelled) return
-      // Confirmed against real data (Overlord's 4 AniList season entries all
-      // return an identical, verbatim-Season-1 episode list) that AniList's
-      // streamingEpisodes can be duplicated across a franchise's separate
-      // season ids — not a per-show fetch bug, but bad upstream data. Showing
-      // that duplicated list as if it were each season's own real episodes
-      // would be worse than the honest "Episode N" fallback, so once a
-      // season's list has been seen for an earlier season in this same show,
-      // later seasons with the exact same first title are treated as having
-      // no usable data.
-      const seenFirstTitles = new Set<string>()
-      const deduped: [number | null, StreamingEpisode[]][] = results.map(([season, episodes]) => {
-        const firstTitle = episodes[0]?.title
-        if (firstTitle != null) {
-          if (seenFirstTitles.has(firstTitle)) return [season, []]
-          seenFirstTitles.add(firstTitle)
-        }
-        return [season, episodes]
+    getStreamingEpisodes(anilistId)
+      .catch(() => [])
+      .then((result) => {
+        if (!cancelled) setStreaming(result)
       })
-      setStreamingBySeason(new Map(deduped))
-    })
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anilistId, seasonNumbersKey, seasonAnilistKey])
+  }, [anilistId])
 
   const watchedCount = episodes.filter((e) => e.watchCount > 0).length
   const selectedEp = episodes.find((e) => e.number === selected) ?? null
   const seasonGroups = groupBySeasons(episodes)
   const selectedGroup = selectedEp ? seasonGroups.find((g) => g.season === selectedEp.seasonNumber) : undefined
-  const selectedStream = selectedGroup
-    ? streamingBySeason.get(selectedGroup.season)?.[selectedGroup.episodes.indexOf(selectedEp!)]
-    : undefined
+  const selectedStream = selectedGroup ? streaming[selectedGroup.episodes.indexOf(selectedEp!)] : undefined
 
   return (
     <div className="mt-5">
@@ -335,7 +295,7 @@ export function EpisodeList({
               />
               <div className="space-y-1.5">
                 {group.episodes.map((ep, epIdx) => {
-                  const stream = streamingBySeason.get(group.season)?.[epIdx]
+                  const stream = streaming[epIdx]
                   return (
                     <div
                       key={ep.number}
@@ -399,7 +359,7 @@ export function EpisodeList({
               />
               <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-12">
                 {group.episodes.map((ep, epIdx) => {
-                  const stream = streamingBySeason.get(group.season)?.[epIdx]
+                  const stream = streaming[epIdx]
                   const thumb = ep.artUrl ?? stream?.thumbnail ?? null
                   return (
                     <button
