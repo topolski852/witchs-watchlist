@@ -7,6 +7,19 @@ export interface WatchTimeMinutes {
 }
 
 /**
+ * Standard TV anime episode length, used only when an episode has no
+ * duration anywhere (not its own, not the show's) — e.g. a show TV Time
+ * followed that has no AniList match at all, so there's no runtime data to
+ * pull from. Falling back to 0 in that case would silently treat "we don't
+ * know how long this is" as "this episode is 0 minutes long," which
+ * quietly zeroes out watch time for every unmatched show regardless of how
+ * many episodes it has. 24 is a reasonable estimate, not a real fact — set
+ * a real per-season duration (EpisodeList's "Min/ep" control) wherever it's
+ * known to override this.
+ */
+const DEFAULT_EPISODE_DURATION_MIN = 24
+
+/**
  * new watch time = first watch of each episode (watchCount > 0)
  * rewatch time = every watch after the first (watchCount - 1)
  */
@@ -14,7 +27,7 @@ export function showWatchTime(show: Show): WatchTimeMinutes {
   let newMinutes = 0
   let rewatchMinutes = 0
   for (const ep of show.episodes) {
-    const duration = ep.durationMin ?? show.episodeDurationMin ?? 0
+    const duration = ep.durationMin ?? show.episodeDurationMin ?? DEFAULT_EPISODE_DURATION_MIN
     if (ep.watchCount > 0) newMinutes += duration
     rewatchMinutes += Math.max(0, ep.watchCount - 1) * duration
   }
