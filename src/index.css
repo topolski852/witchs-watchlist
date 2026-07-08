@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+/* Cinzel — self-hosted (no runtime font-CDN call, so the PWA still works
+   fully offline) from Google Fonts, SIL Open Font License (see
+   assets/fonts/Cinzel-OFL.txt). An elegant Roman-inspired display face that
+   reads as mystical/ceremonial without tipping into illegible gothic
+   blackletter — used for headings and the big stat numbers. */
+@font-face {
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Cinzel-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/Cinzel-Bold.woff2") format("woff2");
+}
+
 @theme {
   --color-bg: #0f0a1a;
   --color-surface: #1a1329;
@@ -19,7 +39,16 @@
   --color-status-stopped: #d97a7a;
   --color-status-plan: #7c6d94;
 
-  --font-display: "Georgia", "Iowan Old Style", serif;
+  --font-display: "Cinzel", "Georgia", serif;
+}
+
+/* Cinzel's numerals are lining/tabular already, but Georgia (the fallback
+   for any glyph Cinzel doesn't cover) uses old-style figures with uneven
+   heights — "0" in particular sits shorter than "1"/"8". Forcing lining +
+   tabular figures here keeps every digit the same height/width everywhere
+   `font-display` is used, e.g. the Stats/Home page numbers. */
+.font-display {
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 html,

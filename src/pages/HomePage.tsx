@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useData } from '../store/useData'
 import { ShelfRow, type ShelfItem } from '../components/ShelfRow'
+import { StatCard } from '../components/StatCard'
 import { formatDurationParts, totalWatchTime } from '../lib/watchTime'
 
 function lastWatchedAt(show: { episodes: { watchDates: string[] }[] }): string | null {
@@ -48,21 +49,15 @@ export function HomePage() {
       ) : (
         <>
           <div className="flex gap-3 overflow-x-auto pb-1">
-            <div className="shrink-0 rounded-lg border border-border bg-surface px-4 py-3">
-              <p className="text-center text-xs text-text-faint">Total Time</p>
-              <div className="mt-1.5 flex gap-4">
-                {(['months', 'days', 'hours'] as const).map((unit) => (
-                  <div key={unit} className="text-center">
-                    <p className="font-display text-xl text-text">{duration[unit]}</p>
-                    <p className="text-[11px] capitalize text-text-faint">{unit}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="shrink-0 rounded-lg border border-border bg-surface px-4 py-3">
-              <p className="text-center text-xs text-text-faint">Episodes Watched</p>
-              <p className="mt-1.5 text-center font-display text-xl text-text">{episodesWatched}</p>
-            </div>
+            <StatCard
+              title="Total Time"
+              stats={[
+                { value: duration.months, label: 'Months' },
+                { value: duration.days, label: 'Days' },
+                { value: duration.hours, label: 'Hours' },
+              ]}
+            />
+            <StatCard title="Episodes Watched" stats={[{ value: episodesWatched }]} />
           </div>
 
           <ShelfRow title="Shows" count={recentShelf.length} to="/shows" items={recentShelf} />

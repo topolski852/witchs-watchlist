@@ -1,16 +1,8 @@
 import { useMemo } from 'react'
 import { useData } from '../store/useData'
+import { StatCard } from '../components/StatCard'
 import { formatMinutes, showWatchTime, totalWatchTime } from '../lib/watchTime'
 import { WATCH_STATUSES } from '../types/schema'
-
-function StatTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-surface p-3">
-      <p className="text-xs text-text-faint">{label}</p>
-      <p className="mt-1 font-display text-xl text-text">{value}</p>
-    </div>
-  )
-}
 
 export function StatsPage() {
   const { shows } = useData()
@@ -41,19 +33,25 @@ export function StatsPage() {
     <div className="space-y-6 pb-6">
       <div>
         <h2 className="mb-2 text-sm font-semibold text-text">Watch time</h2>
-        <div className="grid grid-cols-3 gap-2">
-          <StatTile label="New" value={formatMinutes(time.newMinutes)} />
-          <StatTile label="Rewatch" value={formatMinutes(time.rewatchMinutes)} />
-          <StatTile label="Total" value={formatMinutes(time.totalMinutes)} />
-        </div>
+        <StatCard
+          title="Minutes Watched"
+          stats={[
+            { value: formatMinutes(time.newMinutes), label: 'New' },
+            { value: formatMinutes(time.rewatchMinutes), label: 'Rewatch' },
+            { value: formatMinutes(time.totalMinutes), label: 'Total' },
+          ]}
+        />
       </div>
 
       <div>
         <h2 className="mb-2 text-sm font-semibold text-text">Overview</h2>
-        <div className="grid grid-cols-2 gap-2">
-          <StatTile label="Shows tracked" value={String(shows.length)} />
-          <StatTile label="Episodes watched" value={String(episodesWatched)} />
-        </div>
+        <StatCard
+          title="Shows & Episodes"
+          stats={[
+            { value: shows.length, label: 'Shows Tracked' },
+            { value: episodesWatched, label: 'Episodes Watched' },
+          ]}
+        />
       </div>
 
       <div>
@@ -62,7 +60,7 @@ export function StatsPage() {
           {byStatus.map((s) => (
             <div key={s.value} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-sm">
               <span className="text-text-muted">{s.label}</span>
-              <span className="text-text">{s.count}</span>
+              <span className="font-display text-text">{s.count}</span>
             </div>
           ))}
         </div>
@@ -75,7 +73,7 @@ export function StatsPage() {
             {mostRewatched.map((s) => (
               <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-sm">
                 <span className="truncate text-text-muted">{s.title}</span>
-                <span className="shrink-0 text-text">{formatMinutes(showWatchTime(s).rewatchMinutes)}</span>
+                <span className="shrink-0 font-display text-text">{formatMinutes(showWatchTime(s).rewatchMinutes)}</span>
               </div>
             ))}
           </div>
