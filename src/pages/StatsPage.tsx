@@ -1,8 +1,20 @@
 import { useMemo } from 'react'
 import { useData } from '../store/useData'
 import { StatCard } from '../components/StatCard'
-import { formatMinutes, showWatchTime, totalWatchTime } from '../lib/watchTime'
+import { formatDurationParts, formatMinutes, showWatchTime, totalWatchTime } from '../lib/watchTime'
 import { WATCH_STATUSES } from '../types/schema'
+
+// Same Months/Days/Hours breakdown the Home page's "Total Time" card uses,
+// so First Watch/Rewatch/Total all read the same way instead of the old
+// single "130d 9h"-style compact string.
+function durationStats(minutes: number) {
+  const d = formatDurationParts(minutes)
+  return [
+    { value: d.months, label: 'Months' },
+    { value: d.days, label: 'Days' },
+    { value: d.hours, label: 'Hours' },
+  ]
+}
 
 export function StatsPage() {
   const { shows } = useData()
@@ -33,14 +45,11 @@ export function StatsPage() {
     <div className="space-y-6 pb-6">
       <div>
         <h2 className="mb-2 text-sm font-semibold text-text">Watch time</h2>
-        <StatCard
-          title="Minutes Watched"
-          stats={[
-            { value: formatMinutes(time.newMinutes), label: 'New' },
-            { value: formatMinutes(time.rewatchMinutes), label: 'Rewatch' },
-            { value: formatMinutes(time.totalMinutes), label: 'Total' },
-          ]}
-        />
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          <StatCard title="First Watch" stats={durationStats(time.newMinutes)} />
+          <StatCard title="Rewatch" stats={durationStats(time.rewatchMinutes)} />
+          <StatCard title="Total" stats={durationStats(time.totalMinutes)} />
+        </div>
       </div>
 
       <div>
