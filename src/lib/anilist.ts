@@ -189,6 +189,11 @@ query ($id: Int) {
   }
 }`
 
+function parseLeadingEpisodeNumber(title: string | null | undefined): number | null {
+  const m = title?.match(/^Episode\s+(\d+)/i)
+  return m ? Number(m[1]) : null
+}
+
 /**
  * Per-episode title + thumbnail, sourced from streaming-site listings AniList
  * aggregates (Crunchyroll etc.) — coverage isn't guaranteed for every show,
@@ -196,6 +201,14 @@ query ($id: Int) {
  * available signal for which episode a given entry represents. Fetched
  * lazily (only when a show's episode list is opened), not persisted to the
  * schema, for the same storage-size reason as getAniListDetails.
+ *
+ * Confirmed against real data that this isn't always a complete, ascending,
+ * episode-1-first list: One Piece's entry (still airing, 1000+ real
+ * episodes) only had a 69-entry *recent* window cached, starting at
+ * "Episode 130" — indexed by position, that shows episode 130's title as if
+ * it were episode 1. If the first entry isn't actually Episode 1, the whole
+ * list is unusable for position-based lookup and gets discarded — a real-
+ * looking but wrong title is worse than the honest "Episode N" fallback.
  */
 export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
   return enqueue(async () => {
@@ -203,7 +216,11 @@ export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
       STREAMING_EPISODES_QUERY,
       { id },
     )
-    return data.Media?.streamingEpisodes ?? []
+    const episodes = data.Media?.streamingEpisodes ?? []
+    if (episodes.length > 0 && parseLeadingEpisodeNumber(episodes[0].title) !== 1) {
+      return []
+    }
+    return episodes
   })
 }
 
@@ -228,15 +245,22 @@ export function hasSequelRelation(media: AniListMedia): boolean {
   return media.relations?.edges.some((e) => e.relationType === 'SEQUEL' && e.node?.type === 'ANIME') ?? false
 }
 
-// Only follow relation edges into another full "season" of the same story —
-// not movies/OVAs/specials, which AniList occasionally still tags PREQUEL/
-// SEQUEL even though they're side content, not a numbered continuation.
-const CHAIN_FORMATS = new Set(['TV', 'ONA'])
+// Only follow relation edges into another numbered TV season of the same
+// story. Confirmed against real data that AniList occasionally tags a
+// one-off ONA/OVA/special as PREQUEL/SEQUEL too (e.g. "One Piece" has a
+// PREQUEL edge to an unrelated one-episode ONA short) — TV-only avoids
+// wandering into those.
+const CHAIN_FORMATS = new Set(['TV'])
 const MAX_CHAIN_HOPS = 20
 
-function chainEdge(media: AniListMedia, type: 'PREQUEL' | 'SEQUEL') {
+function chainEdge(media: AniListMedia, type: 'PREQUEL' | 'SEQUEL', stopIds: Set<number>) {
   return media.relations?.edges.find(
-    (e) => e.relationType === type && e.node?.type === 'ANIME' && e.node.format != null && CHAIN_FORMATS.has(e.node.format),
+    (e) =>
+      e.relationType === type &&
+      e.node?.type === 'ANIME' &&
+      e.node.format != null &&
+      CHAIN_FORMATS.has(e.node.format) &&
+      !stopIds.has(e.node.id),
   )
 }
 
@@ -249,10 +273,21 @@ function chainEdge(media: AniListMedia, type: 'PREQUEL' | 'SEQUEL') {
  * back to the true first season, then SEQUEL relations forward, returning
  * every season in watch order. `fetchById` is injected so this stays
  * testable/reusable without hardcoding the rate-limited network call.
+ *
+ * `stopIds` are AniList ids the walk must never cross into — confirmed
+ * against real data that TV Time sometimes tracks what AniList considers
+ * sequel seasons as entirely separate followed shows with their own
+ * independent progress (e.g. "Naruto" and "Naruto: Shippuden" are two rows
+ * in a TV Time export, each with its own episode-seen count, even though
+ * AniList links them PREQUEL/SEQUEL). Without this, importing either row
+ * would silently absorb the other's episodes into one merged show and
+ * overwrite whichever was imported second. Callers pass every AniList id
+ * that has its own explicit TV Time row (other than the one being walked).
  */
 export async function buildSeasonChain(
   start: AniListMedia,
   fetchById: (id: number) => Promise<AniListMedia | null> = getAniListById,
+  stopIds: Set<number> = new Set(),
 ): Promise<AniListMedia[]> {
   const visited = new Map<number, AniListMedia>([[start.id, start]])
   async function fetchNode(id: number): Promise<AniListMedia | null> {
@@ -265,7 +300,7 @@ export async function buildSeasonChain(
 
   let root = start
   for (let i = 0; i < MAX_CHAIN_HOPS; i++) {
-    const edge = chainEdge(root, 'PREQUEL')
+    const edge = chainEdge(root, 'PREQUEL', stopIds)
     if (!edge?.node) break
     const prev = await fetchNode(edge.node.id)
     if (!prev || prev.id === root.id) break
@@ -275,7 +310,7 @@ export async function buildSeasonChain(
   const chain: AniListMedia[] = [root]
   let cur = root
   for (let i = 0; i < MAX_CHAIN_HOPS; i++) {
-    const edge = chainEdge(cur, 'SEQUEL')
+    const edge = chainEdge(cur, 'SEQUEL', stopIds)
     if (!edge?.node) break
     const next = await fetchNode(edge.node.id)
     if (!next || chain.some((m) => m.id === next.id)) break

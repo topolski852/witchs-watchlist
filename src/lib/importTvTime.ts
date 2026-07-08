@@ -155,6 +155,23 @@ export async function buildImportPlan(
   // AniList search results, keyed by normalized title, so favorite-list entries
   // that reference a show we already imported don't trigger a second lookup.
   const matchCache = new Map<string, AniListMedia | null>()
+
+  // Pass 1: resolve every row's AniList match *before* any season-chain
+  // walking. explicitlyTrackedIds is every id TV Time follows as its own row
+  // — passed as buildSeasonChain's stopIds so a franchise TV Time already
+  // tracks as separate shows (e.g. "Naruto" and "Naruto: Shippuden" are two
+  // rows, each with its own episode-seen count, even though AniList links
+  // them PREQUEL/SEQUEL) never gets merged into one.
+  const matchedByIndex: (AniListMedia | null)[] = []
+  for (let i = 0; i < data.shows.length; i++) {
+    const raw = data.shows[i]
+    onProgress?.({ phase: 'shows', current: i + 1, total: data.shows.length, currentTitle: raw.name })
+    const matched = await matchOne(raw.name)
+    matchCache.set(raw.name, matched)
+    matchedByIndex.push(matched)
+  }
+  const explicitlyTrackedIds = new Set(matchedByIndex.filter((m): m is AniListMedia => m != null).map((m) => m.id))
+
   // Season chains, keyed by *every* media id that appears in them, so a
   // favorite-list entry matching a different season of a show already in the
   // main list still resolves to the same chain/root instead of re-walking it
@@ -163,18 +180,17 @@ export async function buildImportPlan(
   async function resolveChain(media: AniListMedia): Promise<AniListMedia[]> {
     const cached = chainCache.get(media.id)
     if (cached) return cached
-    const chain = await buildSeasonChain(media)
+    const chain = await buildSeasonChain(media, undefined, explicitlyTrackedIds)
     for (const m of chain) chainCache.set(m.id, chain)
     return chain
   }
 
+  // Pass 2: build each show's episodes/seasons from its (now stop-id-aware) chain.
   for (let i = 0; i < data.shows.length; i++) {
     const raw = data.shows[i]
     onProgress?.({ phase: 'shows', current: i + 1, total: data.shows.length, currentTitle: raw.name })
 
-    const matched = await matchOne(raw.name)
-    matchCache.set(raw.name, matched)
-
+    const matched = matchedByIndex[i]
     const chain = matched ? await resolveChain(matched) : null
     const root = chain?.[0] ?? null
     const chainEnd = chain ? chain[chain.length - 1] : null
