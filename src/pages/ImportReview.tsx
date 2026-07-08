@@ -43,6 +43,8 @@ export function ImportReview({
       episodeDurationMin: media.duration,
       needsReview: false,
       reviewNote: null,
+      seasons: null,
+      episodes: relinkTarget.episodes.map((e) => ({ ...e, seasonNumber: null })),
     })
     setRelinkTarget(null)
   }

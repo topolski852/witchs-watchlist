@@ -216,8 +216,17 @@ function isEpisodeOne(title: string | null | undefined): boolean {
  *   gets discarded — a real-looking but wrong title is worse than the
  *   honest "Episode N" fallback.
  */
+// Keyed by AniList id so revisiting the same show's episode list (or two
+// seasons that happen to share an id) reuses one in-flight/resolved request
+// instead of re-queuing a duplicate on the shared, rate-limited queue — every
+// remount of EpisodeList previously did exactly that. A failed request is
+// evicted so it gets retried on next access rather than being cached forever.
+const streamingEpisodesCache = new Map<number, Promise<StreamingEpisode[]>>()
+
 export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
-  return enqueue(async () => {
+  const cached = streamingEpisodesCache.get(id)
+  if (cached) return cached
+  const promise = enqueue(async () => {
     const data = await graphql<{ Media: { streamingEpisodes: StreamingEpisode[] } | null }>(
       STREAMING_EPISODES_QUERY,
       { id },
@@ -226,6 +235,9 @@ export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
     const startIndex = episodes.findIndex((e) => isEpisodeOne(e.title))
     return startIndex === -1 ? [] : episodes.slice(startIndex)
   })
+  promise.catch(() => streamingEpisodesCache.delete(id))
+  streamingEpisodesCache.set(id, promise)
+  return promise
 }
 
 /** "Episode 3 - Actual Title" -> "Actual Title", falling back to "Episode N"

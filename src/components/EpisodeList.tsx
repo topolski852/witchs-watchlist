@@ -272,6 +272,10 @@ export function EpisodeList({
   const watchedCount = episodes.filter((e) => e.watchCount > 0).length
   const selectedEp = episodes.find((e) => e.number === selected) ?? null
   const seasonGroups = groupBySeasons(episodes)
+  const selectedGroup = selectedEp ? seasonGroups.find((g) => g.season === selectedEp.seasonNumber) : undefined
+  const selectedStream = selectedGroup
+    ? streamingBySeason.get(selectedGroup.season)?.[selectedGroup.episodes.indexOf(selectedEp!)]
+    : undefined
 
   return (
     <div className="mt-5">
@@ -375,37 +379,55 @@ export function EpisodeList({
                 onSetSeasonMeta={onSetSeasonMeta}
               />
               <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-12">
-                {group.episodes.map((ep) => (
-                  <button
-                    key={ep.number}
-                    type="button"
-                    onClick={() => setSelected(ep.number)}
-                    className={`relative aspect-square rounded-md border text-[11px] font-medium transition-colors ${
-                      ep.watchCount > 0
-                        ? 'border-accent bg-accent-muted text-text'
-                        : 'border-border text-text-faint hover:border-accent-soft'
-                    } ${selected === ep.number ? 'ring-2 ring-accent' : ''}`}
-                  >
-                    {ep.number}
-                    {ep.watchCount > 1 && (
-                      <span className="absolute -bottom-1 -right-1 rounded-full bg-accent px-1 text-[9px] text-white">
-                        {ep.watchCount}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                {group.episodes.map((ep, epIdx) => {
+                  const stream = streamingBySeason.get(group.season)?.[epIdx]
+                  const thumb = ep.artUrl ?? stream?.thumbnail ?? null
+                  return (
+                    <button
+                      key={ep.number}
+                      type="button"
+                      onClick={() => setSelected(ep.number)}
+                      className={`relative aspect-square rounded-md border text-[11px] font-medium transition-colors ${
+                        ep.watchCount > 0
+                          ? 'border-accent bg-accent-muted text-text'
+                          : 'border-border text-text-faint hover:border-accent-soft'
+                      } ${selected === ep.number ? 'ring-2 ring-accent' : ''}`}
+                    >
+                      {thumb && (
+                        <div className="absolute inset-0 overflow-hidden rounded-md">
+                          <CoverImage src={thumb} alt="" className="h-full w-full" />
+                        </div>
+                      )}
+                      <span className={thumb ? 'relative rounded bg-bg/80 px-1 text-[10px]' : undefined}>{ep.number}</span>
+                      {ep.watchCount > 1 && (
+                        <span className="absolute -bottom-1 -right-1 rounded-full bg-accent px-1 text-[9px] text-white">
+                          {ep.watchCount}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ))}
 
           {selectedEp && (
             <div className="mt-3 rounded-lg border border-border bg-surface p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-text">
-                  Episode {selectedEp.number}
-                  {selectedEp.title && <span className="text-text-muted"> — {selectedEp.title}</span>}
-                </p>
-                <button type="button" onClick={() => setSelected(null)} className="text-text-faint hover:text-text">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  {(selectedEp.artUrl || selectedStream?.thumbnail) && (
+                    <CoverImage
+                      src={selectedEp.artUrl ?? selectedStream?.thumbnail ?? null}
+                      alt=""
+                      className="h-11 w-20 shrink-0 rounded-md"
+                    />
+                  )}
+                  <p className="text-sm font-medium text-text">
+                    Episode {selectedEp.number}
+                    <span className="text-text-muted"> — {selectedEp.title ?? streamingEpisodeTitle(selectedEp.number, selectedStream)}</span>
+                  </p>
+                </div>
+                <button type="button" onClick={() => setSelected(null)} className="shrink-0 text-text-faint hover:text-text">
                   <CloseIcon className="h-4 w-4" />
                 </button>
               </div>
