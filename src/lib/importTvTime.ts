@@ -28,14 +28,14 @@ interface BuiltEpisodes {
 
 /** Flat single-"season" fallback for shows with no AniList match at all —
  * there's no season structure to build without AniList's data behind it. */
-function buildFlatEpisodes(episodesSeen: number): BuiltEpisodes {
+function buildFlatEpisodes(episodesSeen: number, watchDate: string): BuiltEpisodes {
   const episodes: Episode[] = []
   for (let n = 1; n <= episodesSeen; n++) {
     episodes.push({
       number: n,
       seasonNumber: null,
       watchCount: 1,
-      watchDates: [],
+      watchDates: [watchDate],
       durationMin: null,
       title: null,
       description: null,
@@ -56,7 +56,7 @@ function buildFlatEpisodes(episodesSeen: number): BuiltEpisodes {
  * episodes onto the last season — surfaced via a review note, never
  * silently dropped or silently fabricated as fake season data.
  */
-function buildEpisodesFromChain(chain: AniListMedia[], episodesSeen: number): BuiltEpisodes {
+function buildEpisodesFromChain(chain: AniListMedia[], episodesSeen: number, watchDate: string): BuiltEpisodes {
   const episodes: Episode[] = []
   const seasons: SeasonMeta[] = []
   let remaining = episodesSeen
@@ -76,7 +76,7 @@ function buildEpisodesFromChain(chain: AniListMedia[], episodesSeen: number): Bu
         number: globalNumber,
         seasonNumber,
         watchCount: watched ? 1 : 0,
-        watchDates: [],
+        watchDates: watched ? [watchDate] : [],
         durationMin: media.duration,
         title: null,
         description: null,
@@ -95,7 +95,7 @@ function buildEpisodesFromChain(chain: AniListMedia[], episodesSeen: number): Bu
         number: globalNumber,
         seasonNumber: lastSeason,
         watchCount: 1,
-        watchDates: [],
+        watchDates: [watchDate],
         durationMin: null,
         title: null,
         description: null,
@@ -194,7 +194,14 @@ export async function buildImportPlan(
     const chain = matched ? await resolveChain(matched) : null
     const root = chain?.[0] ?? null
     const chainEnd = chain ? chain[chain.length - 1] : null
-    const built = chain ? buildEpisodesFromChain(chain, raw.episodesSeen) : buildFlatEpisodes(raw.episodesSeen)
+    // TV Time's export has no per-episode watch date, only a per-show
+    // "last seen" timestamp — used as every watched episode's date so the
+    // Home page's recency shelf (which reads watchDates) actually includes
+    // the show, instead of it silently vanishing for having none at all.
+    const watchDate = raw.lastSeenAt ?? now
+    const built = chain
+      ? buildEpisodesFromChain(chain, raw.episodesSeen, watchDate)
+      : buildFlatEpisodes(raw.episodesSeen, watchDate)
     const { episodes, seasons, knownTotal } = built
 
     const rewatchEpisodes = data.rewatchByShowName.get(raw.name) ?? []

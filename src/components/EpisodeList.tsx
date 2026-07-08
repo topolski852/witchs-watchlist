@@ -229,18 +229,6 @@ export function EpisodeList({
   const [editingNumber, setEditingNumber] = useState<number | null>(null)
 
   const seasonMetaByNumber = new Map((seasons ?? []).map((s) => [s.number, s]))
-  // Multi-season AniList chains (e.g. My Hero Academia S1-S8) turn out to be
-  // unreliable for this: confirmed against real data that a season's own
-  // AniList id can carry `streamingEpisodes` numbered from Crunchyroll's
-  // *global* continuous catalog (e.g. "Episode 159") rather than that
-  // season's own episodes — AniList lists the entry as 13 episodes, but its
-  // streamingEpisodes were "Episode 139"-"159", nowhere close. Showing that
-  // would look authoritative while being flatly wrong, which is worse than
-  // the honest "Episode N" fallback — so streaming lookups are skipped
-  // entirely once there's more than one season. A single-season show (no
-  // chain, or a chain that only ever found one entry) keeps using them,
-  // since there's no cross-season id to get confused with.
-  const isMultiSeasonChain = (seasons?.length ?? 0) > 1
 
   // A show chained together from multiple AniList seasons needs each
   // season's *own* streaming episode list — S2's episode 1 titles/thumbnails
@@ -257,10 +245,6 @@ export function EpisodeList({
   const seasonAnilistKey = (seasons ?? []).map((s) => `${s.number}:${s.anilistId ?? ''}`).join(',')
 
   useEffect(() => {
-    if (isMultiSeasonChain) {
-      setStreamingBySeason(new Map())
-      return
-    }
     let cancelled = false
     const seasonNumbers = seasonNumbersKey === '' ? [] : seasonNumbersKey.split(',').map((s) => (s === 'null' ? null : Number(s)))
     const jobs: { season: number | null; id: number }[] = []
@@ -283,7 +267,7 @@ export function EpisodeList({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anilistId, seasonNumbersKey, seasonAnilistKey, isMultiSeasonChain])
+  }, [anilistId, seasonNumbersKey, seasonAnilistKey])
 
   const watchedCount = episodes.filter((e) => e.watchCount > 0).length
   const selectedEp = episodes.find((e) => e.number === selected) ?? null

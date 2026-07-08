@@ -189,9 +189,10 @@ query ($id: Int) {
   }
 }`
 
-function parseLeadingEpisodeNumber(title: string | null | undefined): number | null {
-  const m = title?.match(/^Episode\s+(\d+)/i)
-  return m ? Number(m[1]) : null
+/** True for a title like "Episode 1 - ..." or exactly "Episode 1" — careful
+ * not to also match "Episode 10", "Episode 12", etc. */
+function isEpisodeOne(title: string | null | undefined): boolean {
+  return /^Episode\s+1(?!\d)/i.test((title ?? '').trim())
 }
 
 /**
@@ -202,13 +203,18 @@ function parseLeadingEpisodeNumber(title: string | null | undefined): number | n
  * lazily (only when a show's episode list is opened), not persisted to the
  * schema, for the same storage-size reason as getAniListDetails.
  *
- * Confirmed against real data that this isn't always a complete, ascending,
- * episode-1-first list: One Piece's entry (still airing, 1000+ real
- * episodes) only had a 69-entry *recent* window cached, starting at
- * "Episode 130" — indexed by position, that shows episode 130's title as if
- * it were episode 1. If the first entry isn't actually Episode 1, the whole
- * list is unusable for position-based lookup and gets discarded — a real-
- * looking but wrong title is worse than the honest "Episode N" fallback.
+ * Confirmed against real data that this isn't always a clean, position-0,
+ * episode-1-first list:
+ * - Kill la Kill's list has two promo-video entries ("PV 1", "PV 2") before
+ *   "Episode 1" — real, correctly-ordered episode data, just not starting
+ *   at index 0. Sliced to start from wherever "Episode 1" actually is.
+ * - One Piece's entry (still airing, 1000+ real episodes) only had a
+ *   69-entry *recent* window cached, starting at "Episode 130", with no
+ *   "Episode 1" anywhere in it — indexed by position, that would show
+ *   episode 130's title as if it were episode 1. When no entry is actually
+ *   "Episode 1", the whole list is unusable for position-based lookup and
+ *   gets discarded — a real-looking but wrong title is worse than the
+ *   honest "Episode N" fallback.
  */
 export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
   return enqueue(async () => {
@@ -217,10 +223,8 @@ export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
       { id },
     )
     const episodes = data.Media?.streamingEpisodes ?? []
-    if (episodes.length > 0 && parseLeadingEpisodeNumber(episodes[0].title) !== 1) {
-      return []
-    }
-    return episodes
+    const startIndex = episodes.findIndex((e) => isEpisodeOne(e.title))
+    return startIndex === -1 ? [] : episodes.slice(startIndex)
   })
 }
 
