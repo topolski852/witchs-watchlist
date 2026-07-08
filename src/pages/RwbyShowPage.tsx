@@ -1,18 +1,32 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../store/useData'
 import { CoverImage } from '../components/CoverImage'
 import { StatusBadge } from '../components/StatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { MarkThroughDialog } from '../components/MarkThroughDialog'
-import { AboutSection } from '../components/AboutSection'
 import { EpisodeList } from '../components/EpisodeList'
-import { FlagIcon } from '../components/icons'
+import { BeeIcon } from '../components/rwbyIcons'
 import { WATCH_STATUSES, type WatchStatus } from '../types/schema'
 import { showWatchTime, formatMinutes } from '../lib/watchTime'
 import { useShowActions } from '../hooks/useShowActions'
+import { applyRwbySeedData, rwbyNeedsSeed, RWBY_TEAM_EMBLEMS } from '../lib/rwbyData'
 
-export function ShowDetailPage() {
+// Team colors, scoped locally to this one page — not part of the app's
+// global theme tokens, so nothing outside RWBY's own page is affected.
+const RUBY = '#e0344c'
+const WEISS = '#eef1f5'
+const BLAKE = '#8a5cf5'
+const YANG = '#f2b90c'
+
+const BEES = [
+  { top: '8%', left: '6%', size: 28, rotate: -18 },
+  { top: '62%', left: '88%', size: 22, rotate: 12 },
+  { top: '20%', left: '82%', size: 18, rotate: 30 },
+  { top: '72%', left: '14%', size: 20, rotate: -8 },
+]
+
+export function RwbyShowPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { shows, saveShow, removeShow } = useData()
@@ -24,6 +38,15 @@ export function ShowDetailPage() {
   const time = useMemo(() => (show ? showWatchTime(show) : null), [show])
 
   const actions = useShowActions(show ?? PLACEHOLDER_SHOW, saveShow)
+
+  // Fills in the real season/episode titles+runtimes Kelly supplied, the one
+  // time it hasn't happened yet — idempotent, so this is a no-op once done.
+  useEffect(() => {
+    if (show && rwbyNeedsSeed(show)) {
+      saveShow(applyRwbySeedData(show))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show])
 
   if (!show) {
     return (
@@ -49,98 +72,74 @@ export function ShowDetailPage() {
 
   return (
     <div className="pb-6">
-      {show.bannerUrl ? (
-        <div className="relative -mx-4 mb-3 h-44 overflow-hidden sm:h-56 sm:rounded-b-xl">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${show.bannerUrl})` }}
-            aria-hidden
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/60 to-bg/10" aria-hidden />
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="absolute left-4 top-[max(0.75rem,env(safe-area-inset-top))] rounded-full bg-bg/70 px-2.5 py-1 text-sm text-text backdrop-blur hover:bg-bg/90"
-          >
-            ← Back
-          </button>
-          <div className="absolute inset-x-4 bottom-3 flex items-end gap-4">
-            <CoverImage
-              src={show.customCoverUrl || show.coverUrl}
-              alt={show.title}
-              className="h-32 w-24 shrink-0 rounded-lg border border-border shadow-lg sm:h-36 sm:w-28"
-            />
-            <div className="min-w-0 flex-1 pb-1">
-              <h2 className="font-display text-lg leading-tight text-text drop-shadow-sm sm:text-xl">
-                {show.title}
-              </h2>
-              <p className="mt-1 text-xs text-text-muted">
-                {show.format ?? 'Unknown format'} · {show.totalEpisodes ?? '?'} episodes ·{' '}
-                {show.episodeDurationMin ?? '?'} min/ep
-              </p>
-              <div className="mt-2">
-                <StatusBadge status={show.status} />
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="mb-2 text-sm text-text-faint hover:text-text-muted"
-        >
-          ← Back
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="mb-2 text-sm text-text-faint hover:text-text-muted"
+      >
+        ← Back
+      </button>
 
-      <div className={show.bannerUrl ? '' : 'flex gap-4'}>
-        {!show.bannerUrl && (
+      {/* Hero: the 4 team colors + symbols, with a few bees scattered around
+          for Bumblebee (Blake x Yang, canon as of Volume 9). */}
+      <div
+        className="relative -mx-4 overflow-hidden px-4 py-6 sm:rounded-b-2xl"
+        style={{
+          background: `linear-gradient(120deg, ${RUBY}26 0%, ${WEISS}14 33%, ${BLAKE}26 66%, ${YANG}22 100%)`,
+        }}
+      >
+        {BEES.map((b, i) => (
+          <BeeIcon
+            key={i}
+            aria-hidden
+            className="pointer-events-none absolute opacity-15"
+            style={{
+              top: b.top,
+              left: b.left,
+              width: b.size,
+              height: b.size,
+              transform: `rotate(${b.rotate}deg)`,
+              color: YANG,
+            }}
+          />
+        ))}
+
+        <div className="relative flex items-center gap-4">
           <CoverImage
             src={show.customCoverUrl || show.coverUrl}
             alt={show.title}
-            className="h-40 w-28 shrink-0 rounded-lg border border-border"
+            className="h-32 w-24 shrink-0 rounded-lg border border-border shadow-lg sm:h-36 sm:w-28"
           />
-        )}
-        <div className="min-w-0 flex-1">
-          {!show.bannerUrl && (
-            <>
-              <h2 className="font-display text-lg leading-tight text-text">{show.title}</h2>
-              <p className="mt-1 text-xs text-text-faint">
-                {show.format ?? 'Unknown format'} · {show.totalEpisodes ?? '?'} episodes ·{' '}
-                {show.episodeDurationMin ?? '?'} min/ep
-              </p>
-              <div className="mt-2">
-                <StatusBadge status={show.status} />
-              </div>
-            </>
-          )}
-          {time && (
-            <p className="mt-2 text-xs text-text-muted">
-              {formatMinutes(time.newMinutes)} watched
-              {time.rewatchMinutes > 0 && <> · {formatMinutes(time.rewatchMinutes)} rewatched</>}
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-xl leading-tight text-text sm:text-2xl">{show.title}</h2>
+            <p className="mt-1 text-xs text-text-muted">
+              {show.format ?? 'Unknown format'} · {show.totalEpisodes ?? '?'} episodes
             </p>
-          )}
+            <div className="mt-2 flex items-center gap-2">
+              {RWBY_TEAM_EMBLEMS.map(({ name, color, url }) => (
+                <div
+                  key={name}
+                  title={name}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 p-1 shadow-sm"
+                  style={{ boxShadow: `0 0 0 2px ${color}` }}
+                >
+                  <img src={url} alt={name} referrerPolicy="no-referrer" className="h-full w-full object-contain" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-2">
+              <StatusBadge status={show.status} />
+            </div>
+          </div>
         </div>
-      </div>
 
-      <AboutSection anilistId={show.anilistId} hasSequel={show.hasSequel} />
-
-      {show.needsReview && (
-        <div className="mt-4 rounded-lg border border-status-stopped/50 bg-status-stopped/10 p-3 text-sm text-text">
-          <p className="flex items-center gap-1.5 font-medium text-status-stopped">
-            <FlagIcon className="h-4 w-4" /> Needs review
+        {time && (
+          <p className="relative mt-3 text-xs text-text-muted">
+            {formatMinutes(time.newMinutes)} watched
+            {time.rewatchMinutes > 0 && <> · {formatMinutes(time.rewatchMinutes)} rewatched</>}
           </p>
-          {show.reviewNote && <p className="mt-1 text-text-muted">{show.reviewNote}</p>}
-          <button
-            type="button"
-            onClick={() => update({ needsReview: false })}
-            className="mt-2 rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface"
-          >
-            Mark as reviewed
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         <label className="text-xs text-text-faint">
@@ -174,7 +173,7 @@ export function ShowDetailPage() {
       </div>
 
       <label className="mt-3 block text-xs text-text-faint">
-        Custom cover URL (overrides AniList art)
+        Custom cover URL
         <div className="mt-1 flex gap-2">
           <input
             value={customCoverDraft}
@@ -258,9 +257,8 @@ export function ShowDetailPage() {
   )
 }
 
-// useShowActions can't be called conditionally (rules of hooks), but `show`
-// may briefly be undefined on first render for an unknown id — this
-// placeholder keeps the hook call unconditional without ever being rendered.
+// Same rules-of-hooks workaround as ShowDetailPage: useShowActions can't be
+// called conditionally, but `show` may briefly be undefined for an unknown id.
 const PLACEHOLDER_SHOW = {
   id: '',
   anilistId: null,

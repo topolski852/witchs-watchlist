@@ -112,6 +112,17 @@ export function FlagIcon(props: IconProps) {
   )
 }
 
+/** Small edit-details toggle — a wand tip standing in for a pencil. */
+export function PencilIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M14.5 4.5 L19.5 9.5 L8 21 L3.5 21 L3.5 16.5 Z" strokeLinejoin="round" />
+      <path d="M12.5 6.5 L17.5 11.5" />
+      <circle cx="18.5" cy="5.5" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
 const CHEVRON_ROTATION = { down: undefined, up: 'rotate(180deg)', right: 'rotate(-90deg)' } as const
 
 export function ChevronIcon({

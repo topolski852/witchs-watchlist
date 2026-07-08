@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid'
-import type { Episode, Show } from '../types/schema'
+import type { Episode, SeasonMeta, Show } from '../types/schema'
 
 export interface CustomShowSeason {
   episodeCount: number
@@ -24,8 +24,10 @@ export interface CustomShowInput {
 export function buildCustomShow(input: CustomShowInput): Show {
   const now = new Date().toISOString()
   const episodes: Episode[] = []
+  const seasons: SeasonMeta[] = []
   let number = 1
   input.seasons.forEach((season, seasonIndex) => {
+    seasons.push({ number: seasonIndex + 1, name: null, bannerUrl: null })
     for (let i = 0; i < season.episodeCount; i++) {
       episodes.push({
         number: number++,
@@ -33,6 +35,9 @@ export function buildCustomShow(input: CustomShowInput): Show {
         watchCount: 0,
         watchDates: [],
         durationMin: null,
+        title: null,
+        description: null,
+        artUrl: null,
       })
     }
   })
@@ -51,6 +56,7 @@ export function buildCustomShow(input: CustomShowInput): Show {
     status: 'plan_to_watch',
     watchCount: 0,
     episodes,
+    seasons,
     needsReview: false,
     reviewNote: null,
     notes: null,

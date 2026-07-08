@@ -28,6 +28,9 @@ function buildEpisodes(totalEpisodes: number | null, episodesSeen: number): Epis
       watchCount: n <= episodesSeen ? 1 : 0,
       watchDates: [],
       durationMin: null,
+      title: null,
+      description: null,
+      artUrl: null,
     })
   }
   return episodes
@@ -116,6 +119,7 @@ export async function buildImportPlan(
       status,
       watchCount: showWatchCount,
       episodes,
+      seasons: null,
       needsReview: !matched || rewatchEpisodes.length > 0,
       reviewNote: notes.length > 0 ? notes.join(' ') : null,
       notes: null,

@@ -25,6 +25,17 @@ export interface Episode {
    * (e.g. RWBY's short early volumes vs. later normal-length ones) be set
    * per season instead of forcing one duration across the whole show. */
   durationMin: number | null
+  /** Custom-show-only episode title override — null falls back to the
+   * AniList streaming-title lookup (or "Episode N") used elsewhere. */
+  title: string | null
+  description: string | null
+  artUrl: string | null
+}
+
+export interface SeasonMeta {
+  number: number
+  name: string | null
+  bannerUrl: string | null
 }
 
 export interface Show {
@@ -44,6 +55,9 @@ export interface Show {
   /** Running total times the whole show has been watched (0 = never fully watched). */
   watchCount: number
   episodes: Episode[]
+  /** Per-season name/banner metadata for custom shows with a season split —
+   * null for AniList-backed shows, which don't have a season structure here. */
+  seasons: SeasonMeta[] | null
   needsReview: boolean
   reviewNote: string | null
   notes: string | null

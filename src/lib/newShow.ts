@@ -12,6 +12,9 @@ export function buildShowFromMedia(media: AniListMedia): Show {
     watchCount: 0,
     watchDates: [],
     durationMin: null,
+    title: null,
+    description: null,
+    artUrl: null,
   }))
   return {
     id: uuid(),
@@ -27,6 +30,7 @@ export function buildShowFromMedia(media: AniListMedia): Show {
     status: 'plan_to_watch',
     watchCount: 0,
     episodes,
+    seasons: null,
     needsReview: false,
     reviewNote: null,
     notes: null,

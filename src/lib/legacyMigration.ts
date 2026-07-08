@@ -1,4 +1,4 @@
-import type { Episode, Show } from '../types/schema'
+import type { Episode, SeasonMeta, Show } from '../types/schema'
 
 // Pre-v2 shape: episodes tracked `watched`/`rewatchCount` separately, and a
 // show's `rewatchCount` meant "extra rewatches beyond the first," not an
@@ -15,12 +15,16 @@ interface LegacyEpisode {
   watchCount?: number
   watchDates?: string[]
   durationMin?: number | null
+  title?: string | null
+  description?: string | null
+  artUrl?: string | null
 }
 
 interface LegacyShow {
   rewatchCount?: number
   watchCount?: number
   episodes: LegacyEpisode[]
+  seasons?: SeasonMeta[] | null
   [key: string]: unknown
 }
 
@@ -32,11 +36,23 @@ function migrateEpisode(ep: LegacyEpisode): Episode {
       watchCount: ep.watchCount,
       watchDates: ep.watchDates ?? [],
       durationMin: ep.durationMin ?? null,
+      title: ep.title ?? null,
+      description: ep.description ?? null,
+      artUrl: ep.artUrl ?? null,
     }
   }
   const watchCount = (ep.watched ? 1 : 0) + (ep.rewatchCount ?? 0)
   const watchDates = ep.watchedAt ? [ep.watchedAt, ...(ep.rewatchDates ?? [])] : (ep.rewatchDates ?? [])
-  return { number: ep.number, seasonNumber: ep.seasonNumber, watchCount, watchDates, durationMin: null }
+  return {
+    number: ep.number,
+    seasonNumber: ep.seasonNumber,
+    watchCount,
+    watchDates,
+    durationMin: null,
+    title: null,
+    description: null,
+    artUrl: null,
+  }
 }
 
 /** True if this show still uses the pre-v2 watched/rewatchCount shape. */
@@ -53,5 +69,6 @@ export function migrateShow(raw: unknown): Show {
     ...show,
     watchCount,
     episodes: show.episodes.map(migrateEpisode),
+    seasons: show.seasons ?? null,
   } as Show
 }
