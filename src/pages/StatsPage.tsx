@@ -6,11 +6,13 @@ import { WATCH_STATUSES } from '../types/schema'
 
 // Same Months/Days/Hours breakdown the Home page's "Total Time" card uses,
 // so First Watch/Rewatch/Total all read the same way instead of the old
-// single "130d 9h"-style compact string.
+// single "130d 9h"-style compact string. "Mo" instead of "Months" here since
+// these 3 cards each only get a third of the page's width, unlike Home's
+// single content-sized card.
 function durationStats(minutes: number) {
   const d = formatDurationParts(minutes)
   return [
-    { value: d.months, label: 'Months' },
+    { value: d.months, label: 'Mo' },
     { value: d.days, label: 'Days' },
     { value: d.hours, label: 'Hours' },
   ]
@@ -45,7 +47,7 @@ export function StatsPage() {
     <div className="space-y-6 pb-6">
       <div>
         <h2 className="mb-2 text-sm font-semibold text-text">Watch time</h2>
-        <div className="flex gap-3 overflow-x-auto pb-1">
+        <div className="grid grid-cols-3 gap-3">
           <StatCard title="First Watch" stats={durationStats(time.newMinutes)} />
           <StatCard title="Rewatch" stats={durationStats(time.rewatchMinutes)} />
           <StatCard title="Total" stats={durationStats(time.totalMinutes)} />

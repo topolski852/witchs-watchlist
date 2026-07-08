@@ -51,13 +51,14 @@ export function HomePage() {
           <div className="flex gap-3 overflow-x-auto pb-1">
             <StatCard
               title="Total Time"
+              className="shrink-0"
               stats={[
                 { value: duration.months, label: 'Months' },
                 { value: duration.days, label: 'Days' },
                 { value: duration.hours, label: 'Hours' },
               ]}
             />
-            <StatCard title="Episodes Watched" stats={[{ value: episodesWatched }]} />
+            <StatCard title="Episodes Watched" className="shrink-0" stats={[{ value: episodesWatched }]} />
           </div>
 
           <ShelfRow title="Shows" count={recentShelf.length} to="/shows" items={recentShelf} />
