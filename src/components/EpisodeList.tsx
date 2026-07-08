@@ -261,7 +261,26 @@ export function EpisodeList({
         async (j) => [j.season, await getStreamingEpisodes(j.id).catch(() => [])] as [number | null, StreamingEpisode[]],
       ),
     ).then((results) => {
-      if (!cancelled) setStreamingBySeason(new Map(results))
+      if (cancelled) return
+      // Confirmed against real data (Overlord's 4 AniList season entries all
+      // return an identical, verbatim-Season-1 episode list) that AniList's
+      // streamingEpisodes can be duplicated across a franchise's separate
+      // season ids — not a per-show fetch bug, but bad upstream data. Showing
+      // that duplicated list as if it were each season's own real episodes
+      // would be worse than the honest "Episode N" fallback, so once a
+      // season's list has been seen for an earlier season in this same show,
+      // later seasons with the exact same first title are treated as having
+      // no usable data.
+      const seenFirstTitles = new Set<string>()
+      const deduped: [number | null, StreamingEpisode[]][] = results.map(([season, episodes]) => {
+        const firstTitle = episodes[0]?.title
+        if (firstTitle != null) {
+          if (seenFirstTitles.has(firstTitle)) return [season, []]
+          seenFirstTitles.add(firstTitle)
+        }
+        return [season, episodes]
+      })
+      setStreamingBySeason(new Map(deduped))
     })
     return () => {
       cancelled = true
