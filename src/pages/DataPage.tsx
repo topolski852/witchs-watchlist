@@ -126,7 +126,7 @@ export function DataPage() {
     setProgress(null)
     try {
       const parsed = await parseTvTimeFiles(tvTimeFiles)
-      const builtPlan = await buildImportPlan(parsed, setProgress)
+      const builtPlan = await buildImportPlan(parsed, setProgress, shows, customLists)
       setPlan(builtPlan)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'TV Time import failed.')

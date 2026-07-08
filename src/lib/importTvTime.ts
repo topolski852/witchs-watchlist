@@ -18,8 +18,21 @@ export interface ImportPlan {
   unmatchedCount: number
 }
 
+/**
+ * AniList splits long-running/seasonal anime into multiple separate media
+ * entries (e.g. "My Hero Academia" Season 1 is its own entry with 13
+ * episodes, entirely separate from Season 2+), while TV Time counted
+ * episodes continuously across every season under one followed show. If the
+ * matched AniList entry's episode count is smaller than what TV Time
+ * recorded as seen, using it as the cap would silently truncate the episode
+ * list and throw away real watch history/time — so the *larger* of the two
+ * numbers always wins here. The show still only links to one AniList entry
+ * (this data model doesn't support multi-season splits), so the extra
+ * episodes beyond the matched entry's own count are unlabeled placeholders;
+ * `needsReview` flags this in buildImportPlan so it's visible, not silent.
+ */
 function buildEpisodes(totalEpisodes: number | null, episodesSeen: number): Episode[] {
-  const count = totalEpisodes ?? episodesSeen
+  const count = Math.max(totalEpisodes ?? 0, episodesSeen)
   const episodes: Episode[] = []
   for (let n = 1; n <= count; n++) {
     episodes.push({
@@ -50,15 +63,36 @@ async function matchOne(title: string): Promise<AniListMedia | null> {
  * favorite-list entry to AniList, applies the status/rewatch heuristics, and
  * returns Show/CustomList records ready for review — nothing is written to the
  * DB here, that happens only after the user confirms on the Review screen.
+ *
+ * `existingShows`/`existingLists` let re-running an import (e.g. after a bug
+ * fix, or a fresh TV Time export) update shows/lists already in the watchlist
+ * in place instead of creating duplicates: a match reuses the existing
+ * show/list's id (and the show's createdAt/notes/customCoverUrl/
+ * skipMarkThroughPrompt, so manual edits since the last import survive),
+ * while episode/watch data is rebuilt fresh from this import. Anything not
+ * matched here (custom shows, unrelated lists) is left completely alone —
+ * this function only ever returns shows/lists to upsert, never a deletion.
  */
 export async function buildImportPlan(
   data: ParsedTvTimeData,
   onProgress?: (p: ImportProgress) => void,
+  existingShows: Show[] = [],
+  existingLists: CustomList[] = [],
 ): Promise<ImportPlan> {
   const now = new Date().toISOString()
   const shows: Show[] = []
   let matchedCount = 0
   let unmatchedCount = 0
+
+  // Reconciling by AniList id only (never by title) is deliberate: a custom,
+  // hand-built show (e.g. one with no AniList match, given its own seasons/
+  // episode art) also has anilistId: null, and could easily share a title
+  // with an unmatched TV Time row — matching on title risks silently
+  // overwriting real hand-entered data with a fresh import. Matching only on
+  // a non-null AniList id can never hit a custom show.
+  const existingByAnilistId = new Map(
+    existingShows.filter((s): s is Show & { anilistId: number } => s.anilistId != null).map((s) => [s.anilistId, s]),
+  )
 
   // AniList search results, keyed by normalized title, so favorite-list entries
   // that reference a show we already imported don't trigger a second lookup.
@@ -101,30 +135,41 @@ export async function buildImportPlan(
     if (matched && episodes.length === 0) {
       notes.push('AniList has no episode count for this title yet — episode list left empty.')
     }
+    // The AniList season-split case buildEpisodes compensates for — flag it
+    // so it's visible rather than a silently-inflated episode count.
+    const seasonSplit = matched?.episodes != null && matched.episodes < raw.episodesSeen
+    if (seasonSplit) {
+      notes.push(
+        `TV Time recorded ${raw.episodesSeen} episodes seen, but the matched AniList entry only lists ${matched!.episodes} — it likely only covers one season of this show. Episode count was kept at ${raw.episodesSeen} to preserve your watch history; verify the episode list and consider re-linking to a different AniList entry if one covers the full series.`,
+      )
+    }
 
     const hasSequel = matched ? hasSequelRelation(matched) : false
     const status = deriveWatchStatus(episodes, hasSequel, raw.archived ? 'stopped' : 'watching')
 
+    const title = matched ? bestTitle(matched) : raw.name
+    const existing = matched ? existingByAnilistId.get(matched.id) : undefined
+
     shows.push({
-      id: uuid(),
+      id: existing?.id ?? uuid(),
       anilistId: matched?.id ?? null,
-      title: matched ? bestTitle(matched) : raw.name,
+      title,
       coverUrl: matched?.coverImage.large ?? null,
       bannerUrl: matched?.bannerImage ?? null,
-      customCoverUrl: null,
+      customCoverUrl: existing?.customCoverUrl ?? null,
       format: matched?.format ?? null,
-      totalEpisodes: matched?.episodes ?? null,
+      totalEpisodes: episodes.length,
       episodeDurationMin: matched?.duration ?? null,
       hasSequel,
       status,
       watchCount: showWatchCount,
       episodes,
-      seasons: null,
-      needsReview: !matched || rewatchEpisodes.length > 0,
+      seasons: existing?.seasons ?? null,
+      needsReview: !matched || rewatchEpisodes.length > 0 || seasonSplit,
       reviewNote: notes.length > 0 ? notes.join(' ') : null,
-      notes: null,
-      skipMarkThroughPrompt: false,
-      createdAt: now,
+      notes: existing?.notes ?? null,
+      skipMarkThroughPrompt: existing?.skipMarkThroughPrompt ?? false,
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     })
   }
@@ -208,19 +253,23 @@ export async function buildImportPlan(
     'movie',
   )
 
+  const existingListByName = new Map(existingLists.map((l) => [l.name, l]))
+  const existingFavoriteShows = existingListByName.get('Favorite Shows')
+  const existingFavoriteMovies = existingListByName.get('Favorite Movies')
+
   const customLists: CustomList[] = [
     {
-      id: uuid(),
+      id: existingFavoriteShows?.id ?? uuid(),
       name: 'Favorite Shows',
       entries: favoriteShowsEntries,
-      createdAt: now,
+      createdAt: existingFavoriteShows?.createdAt ?? now,
       updatedAt: now,
     },
     {
-      id: uuid(),
+      id: existingFavoriteMovies?.id ?? uuid(),
       name: 'Favorite Movies',
       entries: favoriteMoviesEntries,
-      createdAt: now,
+      createdAt: existingFavoriteMovies?.createdAt ?? now,
       updatedAt: now,
     },
   ]
