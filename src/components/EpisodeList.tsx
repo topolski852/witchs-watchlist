@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
 import type { Episode, SeasonMeta } from '../types/schema'
 import { getStreamingEpisodes, streamingEpisodeTitle, type StreamingEpisode } from '../lib/anilist'
+import { getMalEpisodes } from '../lib/jikan'
 import { CoverImage } from './CoverImage'
 import { CloseIcon, PencilIcon } from './icons'
 
 type ViewMode = 'list' | 'grid'
 type EpisodeMetaPatch = Partial<Pick<Episode, 'title' | 'description' | 'artUrl'>>
+
+/** MyAnimeList (via Jikan) doesn't provide per-episode thumbnails, so a
+ * MAL-sourced result carries a real title with no image — still better
+ * than the generic "Episode N" fallback. */
+function malToStreamingEpisodes(episodes: { title: string | null }[]): StreamingEpisode[] {
+  return episodes.map((e) => ({ title: e.title, thumbnail: null }))
+}
 
 /** Groups by seasonNumber, preserving first-seen order. Only meaningful for
  * custom shows, which are the only ones that ever set it — AniList-backed
@@ -202,6 +210,7 @@ function SeasonHeader({
 
 export function EpisodeList({
   anilistId,
+  malId,
   episodes,
   seasons,
   defaultDuration,
@@ -213,6 +222,7 @@ export function EpisodeList({
   onSetEpisodeMeta,
 }: {
   anilistId: number | null
+  malId: number | null
   episodes: Episode[]
   seasons: SeasonMeta[] | null
   defaultDuration: number | null
@@ -242,51 +252,72 @@ export function EpisodeList({
   const seasonNumbersKey = Array.from(new Set(episodes.map((e) => (e.seasonNumber == null ? 'null' : String(e.seasonNumber))))).join(
     ',',
   )
-  const seasonAnilistKey = (seasons ?? []).map((s) => `${s.number}:${s.anilistId ?? ''}`).join(',')
+  const seasonAnilistKey = (seasons ?? []).map((s) => `${s.number}:${s.anilistId ?? ''}:${s.malId ?? ''}`).join(',')
 
   useEffect(() => {
     let cancelled = false
     const seasonNumbers = seasonNumbersKey === '' ? [] : seasonNumbersKey.split(',').map((s) => (s === 'null' ? null : Number(s)))
-    const jobs: { season: number | null; id: number }[] = []
+    const jobs: { season: number | null; id: number; malId: number | null }[] = []
     for (const sn of seasonNumbers) {
-      const id = sn != null ? (seasonMetaByNumber.get(sn)?.anilistId ?? null) : anilistId
-      if (id != null) jobs.push({ season: sn, id })
+      const meta = sn != null ? seasonMetaByNumber.get(sn) : undefined
+      const id = sn != null ? (meta?.anilistId ?? null) : anilistId
+      const jobMalId = sn != null ? (meta?.malId ?? null) : malId
+      if (id != null) jobs.push({ season: sn, id, malId: jobMalId })
     }
     if (jobs.length === 0) {
       setStreamingBySeason(new Map())
       return
     }
-    Promise.all(
-      jobs.map(
-        async (j) => [j.season, await getStreamingEpisodes(j.id).catch(() => [])] as [number | null, StreamingEpisode[]],
-      ),
-    ).then((results) => {
-      if (cancelled) return
-      // Confirmed against real data (Overlord's 4 AniList season entries all
-      // return an identical, verbatim-Season-1 episode list) that AniList's
+
+    async function run() {
+      // Phase 1: AniList first (fast, already-cached-if-repeated). Confirmed
+      // against real data (Overlord's 4 AniList season entries all return an
+      // identical, verbatim-Season-1 episode list) that AniList's
       // streamingEpisodes can be duplicated across a franchise's separate
       // season ids — not a per-show fetch bug, but bad upstream data. Showing
       // that duplicated list as if it were each season's own real episodes
       // would be worse than the honest "Episode N" fallback, so once a
       // season's list has been seen for an earlier season in this same show,
       // later seasons with the exact same first title are treated as having
-      // no usable data.
+      // no usable AniList data — same as a season AniList never had data for
+      // in the first place.
+      const aniListResults = await Promise.all(
+        jobs.map(
+          async (j) => [j.season, await getStreamingEpisodes(j.id).catch(() => [])] as [number | null, StreamingEpisode[]],
+        ),
+      )
       const seenFirstTitles = new Set<string>()
-      const deduped: [number | null, StreamingEpisode[]][] = results.map(([season, episodes]) => {
-        const firstTitle = episodes[0]?.title
+      const afterDedup = aniListResults.map(([season, eps]) => {
+        const firstTitle = eps[0]?.title
         if (firstTitle != null) {
-          if (seenFirstTitles.has(firstTitle)) return [season, []]
+          if (seenFirstTitles.has(firstTitle)) return [season, []] as [number | null, StreamingEpisode[]]
           seenFirstTitles.add(firstTitle)
         }
-        return [season, episodes]
+        return [season, eps] as [number | null, StreamingEpisode[]]
       })
-      setStreamingBySeason(new Map(deduped))
-    })
+
+      // Phase 2: MyAnimeList fallback, only for whatever's left empty after
+      // the dedup above — genuinely missing AniList data and duplicate-
+      // suppressed AniList data are treated identically here.
+      const finalResults = await Promise.all(
+        afterDedup.map(async ([season, eps], i) => {
+          if (eps.length > 0) return [season, eps] as [number | null, StreamingEpisode[]]
+          const jobMalId = jobs[i].malId
+          if (jobMalId == null) return [season, []] as [number | null, StreamingEpisode[]]
+          const malEpisodes = await getMalEpisodes(jobMalId).catch(() => [])
+          return [season, malToStreamingEpisodes(malEpisodes)] as [number | null, StreamingEpisode[]]
+        }),
+      )
+
+      if (!cancelled) setStreamingBySeason(new Map(finalResults))
+    }
+    run()
+
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anilistId, seasonNumbersKey, seasonAnilistKey])
+  }, [anilistId, malId, seasonNumbersKey, seasonAnilistKey])
 
   const watchedCount = episodes.filter((e) => e.watchCount > 0).length
   const selectedEp = episodes.find((e) => e.number === selected) ?? null

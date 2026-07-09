@@ -2,6 +2,7 @@ const ANILIST_ENDPOINT = 'https://graphql.anilist.co'
 
 export interface AniListMedia {
   id: number
+  idMal: number | null
   title: { romaji: string | null; english: string | null; native: string | null }
   coverImage: { large: string | null; extraLarge: string | null }
   bannerImage: string | null
@@ -15,6 +16,7 @@ export interface AniListMedia {
 
 const MEDIA_FIELDS = `
   id
+  idMal
   title { romaji english native }
   coverImage { large extraLarge }
   bannerImage

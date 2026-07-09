@@ -25,6 +25,7 @@ interface LegacyShow {
   watchCount?: number
   episodes: LegacyEpisode[]
   seasons?: SeasonMeta[] | null
+  malId?: number | null
   [key: string]: unknown
 }
 
@@ -70,5 +71,6 @@ export function migrateShow(raw: unknown): Show {
     watchCount,
     episodes: show.episodes.map(migrateEpisode),
     seasons: show.seasons ?? null,
+    malId: show.malId ?? null,
   } as Show
 }

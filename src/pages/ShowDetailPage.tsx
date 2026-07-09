@@ -195,6 +195,7 @@ export function ShowDetailPage() {
       {show.episodes.length > 0 && (
         <EpisodeList
           anilistId={show.anilistId}
+          malId={show.malId}
           episodes={show.episodes}
           seasons={show.seasons}
           defaultDuration={show.episodeDurationMin}
@@ -264,6 +265,7 @@ export function ShowDetailPage() {
 const PLACEHOLDER_SHOW = {
   id: '',
   anilistId: null,
+  malId: null,
   title: '',
   coverUrl: null,
   bannerUrl: null,

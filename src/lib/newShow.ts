@@ -19,6 +19,7 @@ export function buildShowFromMedia(media: AniListMedia): Show {
   return {
     id: uuid(),
     anilistId: media.id,
+    malId: media.idMal ?? null,
     title: bestTitle(media),
     coverUrl: media.coverImage.large,
     bannerUrl: media.bannerImage,

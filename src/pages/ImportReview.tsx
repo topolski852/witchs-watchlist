@@ -36,6 +36,7 @@ export function ImportReview({
     if (!relinkTarget) return
     updateShow(relinkTarget.id, {
       anilistId: media.id,
+      malId: media.idMal ?? null,
       title: bestTitle(media),
       coverUrl: media.coverImage.large,
       format: media.format,

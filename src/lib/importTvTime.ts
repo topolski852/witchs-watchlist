@@ -68,7 +68,13 @@ function buildEpisodesFromChain(chain: AniListMedia[], episodesSeen: number, wat
     // An unknown episode count (e.g. a still-airing final season) absorbs
     // whatever's left rather than being treated as a 0-episode season.
     const count = media.episodes ?? (isLast ? remaining : 0)
-    seasons.push({ number: seasonNumber, name: bestTitle(media), bannerUrl: media.bannerImage, anilistId: media.id })
+    seasons.push({
+      number: seasonNumber,
+      name: bestTitle(media),
+      bannerUrl: media.bannerImage,
+      anilistId: media.id,
+      malId: media.idMal ?? null,
+    })
     for (let n = 1; n <= count; n++) {
       globalNumber++
       const watched = remaining > 0
@@ -257,6 +263,7 @@ export async function buildImportPlan(
     shows.push({
       id: existing?.id ?? uuid(),
       anilistId: root?.id ?? null,
+      malId: root?.idMal ?? null,
       title,
       coverUrl: root?.coverImage.large ?? null,
       bannerUrl: root?.bannerImage ?? null,

@@ -41,11 +41,18 @@ export interface SeasonMeta {
    * thumbnails) use that season's own AniList data instead of the show's
    * top-level anilistId. Null for custom shows and single-entry AniList shows. */
   anilistId: number | null
+  /** That same AniList entry's MyAnimeList id, if AniList knows it — used as
+   * a fallback episode-title source (see lib/jikan.ts) when AniList's own
+   * per-season data is missing or comes back duplicated across seasons. */
+  malId: number | null
 }
 
 export interface Show {
   id: string
   anilistId: number | null
+  /** That same AniList entry's MyAnimeList id, if AniList knows it — same
+   * fallback purpose as SeasonMeta.malId, for shows with no season split. */
+  malId: number | null
   title: string
   coverUrl: string | null
   bannerUrl: string | null
@@ -60,8 +67,9 @@ export interface Show {
   /** Running total times the whole show has been watched (0 = never fully watched). */
   watchCount: number
   episodes: Episode[]
-  /** Per-season name/banner metadata for custom shows with a season split —
-   * null for AniList-backed shows, which don't have a season structure here. */
+  /** Per-season name/banner/AniList-id metadata — set for custom shows with
+   * a season split, and for AniList-backed shows chained across multiple
+   * AniList seasons (see lib/anilist.ts's buildSeasonChain). Null otherwise. */
   seasons: SeasonMeta[] | null
   needsReview: boolean
   reviewNote: string | null

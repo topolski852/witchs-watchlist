@@ -217,7 +217,8 @@ export function applyRwbySeedData(show: Show): Show {
     }
   })
   const seasons = (
-    show.seasons ?? RWBY_SEASON_EPISODE_COUNTS.map((_, i) => ({ number: i + 1, name: null, bannerUrl: null, anilistId: null }))
+    show.seasons ??
+    RWBY_SEASON_EPISODE_COUNTS.map((_, i) => ({ number: i + 1, name: null, bannerUrl: null, anilistId: null, malId: null }))
   ).map((season, i) => ({ ...season, name: season.name ?? RWBY_SEASON_NAMES[i] ?? season.name }))
   return { ...show, episodes, seasons }
 }
