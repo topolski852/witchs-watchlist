@@ -223,18 +223,6 @@ function isEpisodeOne(title: string | null | undefined): boolean {
 // evicted so it gets retried on next access rather than being cached forever.
 const streamingEpisodesCache = new Map<number, Promise<StreamingEpisode[]>>()
 
-// Confirmed against real data (not a hunch): AniList's streamingEpisodes can
-// be duplicated verbatim across a franchise's separate season ids at the
-// source — querying Overlord's 4 season ids independently, all 4 return
-// season 1's exact episode list; Arifureta's 3 season ids all return the
-// final season's list. Each season is its own Show now, so two seasons may
-// never render in the same component together — this has to live here,
-// globally, keyed by first-episode title, so whichever id's data is trusted
-// first this session "claims" that title, and any other id whose sliced
-// list starts with the same title is treated as an unusable copy rather
-// than shown as if it were that season's own real data.
-const claimedFirstTitles = new Map<string, number>()
-
 export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
   const cached = streamingEpisodesCache.get(id)
   if (cached) return cached
@@ -245,14 +233,7 @@ export function getStreamingEpisodes(id: number): Promise<StreamingEpisode[]> {
     )
     const episodes = data.Media?.streamingEpisodes ?? []
     const startIndex = episodes.findIndex((e) => isEpisodeOne(e.title))
-    const sliced = startIndex === -1 ? [] : episodes.slice(startIndex)
-    const firstTitle = sliced[0]?.title
-    if (firstTitle != null) {
-      const owner = claimedFirstTitles.get(firstTitle)
-      if (owner != null && owner !== id) return []
-      claimedFirstTitles.set(firstTitle, id)
-    }
-    return sliced
+    return startIndex === -1 ? [] : episodes.slice(startIndex)
   })
   promise.catch(() => streamingEpisodesCache.delete(id))
   streamingEpisodesCache.set(id, promise)
